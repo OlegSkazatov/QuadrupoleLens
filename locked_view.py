@@ -3,9 +3,12 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import rcParams
-rcParams['toolbar'] = 'None'          # Hide toolbar
+from axis import DynamicXYGrid
+
+# rcParams['toolbar'] = 'None'          # Hide toolbar
 rcParams['animation.embed_limit'] = 10  # Lower FPS during window drags
-NO_Z_AXIS = True
+
+NO_Z_AXIS = False
 
 # ====== PHYSICAL CONSTANTS (SI) ======
 e_phys = 1.602176634e-19  # Elementary charge (C)
@@ -123,28 +126,21 @@ line, = ax.plot([], [], [], 'b-', lw=1)
 ax.view_init(elev=90, azim=-90)  # Perfect XY plane view
 
 if NO_Z_AXIS:
-    # 2. Completely hide Z-axis grid
-    ax.zaxis._axinfo["grid"].update({"visible": False})  # Hide grid lines
+    # 2. Completely hide Z-axis
     ax.set_zticks([])  # Remove tick marks
     ax.zaxis.line.set_color((1,1,1,0))  # Fully transparent Z-axis line
 
-    # Hide secondary grid lines too
-    ax.xaxis.pane.set_edgecolor('w')  # White edges (invisible)
-    ax.yaxis.pane.set_edgecolor('w')
-    ax.zaxis.pane.set_edgecolor('w')
-
+    # Hide grids
+    ax.grid(False)
 
     # 3. Make XY plane more visible
-    ax.xaxis.pane.fill = True
-    ax.yaxis.pane.fill = True
     ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))  # Hide YZ Plane
     ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))  # Hide XZ Plane
     ax.zaxis.set_pane_color((0.9, 0.9, 0.9, 1.0))  # Make XY Plane visible
-    ax.xaxis._axinfo["grid"].update({"linewidth": 0.5})
-    ax.yaxis._axinfo["grid"].update({"linewidth": 0.5})
 
     # 4. Set orthographic projection
     ax.set_proj_type('ortho')
+#   grid = DynamicXYGrid(ax, fig)
 
 # Animation (same as before)
 def update(frame):
@@ -157,6 +153,7 @@ def update(frame):
 
 ani = FuncAnimation(fig, update, frames=range(steps//skip_frames),
                     interval=20, blit=False)
-
+ax.set_xlabel("X", labelpad=15)  # Increased padding for 3D visibility
+ax.set_ylabel("Y", labelpad=15)
 plt.tight_layout()
 plt.show()
