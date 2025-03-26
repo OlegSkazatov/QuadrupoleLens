@@ -30,13 +30,12 @@ k = k_phys / B0  # Rescaled gradient
 
 
 def magnetic_field(x, y, z):
-    """Quadrupole field (aligned along X-axis): B = (0, k*y, k*z)."""
+    """Quadrupole field (X-axis aligned): B = (0, k*y, k*z)."""
     x_abs = np.abs(x)
     r = np.sqrt(y ** 2 + z ** 2)
     if x_abs <= L / 2 and r <= R:
-        # Explicitly enforce B=0 if y=z=0 to avoid numerical noise
         if np.allclose([y, z], [0.0, 0.0], atol=1e-15):
-            Bx, By, Bz = 0.0, 0.0, 0.0
+            Bx, By, Bz = 0.0, 0.0, 0.0  # Enforce B=0 on-axis
         else:
             Bx = 0.0
             By = k * y
@@ -47,8 +46,8 @@ def magnetic_field(x, y, z):
 
 
 # ====== INITIAL CONDITIONS ======
-v0_phys = np.array([0.99 * c_phys, 0.0, 0.0])  # Purely along X-axis
-r0_phys = np.array([-20e-3, 0.0, 0.0])  # Strictly on-axis (y=z=0)
+v0_phys = np.array([0.99 * c_phys, 0.0, 0.0])  # Along X-axis
+r0_phys = np.array([-20e-3, 0.0, 0.0])  # Slightly off-axis
 
 # Convert to rescaled units
 v0 = v0_phys / c_phys
@@ -86,12 +85,23 @@ for i in range(1, steps):
     positions[i] = r_new
     velocities[i] = v_new
 
-# ====== CONVERT BACK TO PHYSICAL UNITS ======
+# ====== CONVERT TO PHYSICAL UNITS ======
 positions_phys = positions * L0  # Convert to meters
 
-# ====== PLOT SETUP ======
-fig = plt.figure(figsize=(12, 8))
+# ====== VISUALIZATION SETUP ======
+fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
+
+# Enable mouse wheel zoom by modifying the axes' event handling
+def on_scroll(event):
+    if event.inaxes == ax:
+        scale = 1.1 if event.button == 'up' else 1/1.1
+        ax.set_xlim3d([x/scale for x in ax.get_xlim3d()])
+        ax.set_ylim3d([y/scale for y in ax.get_ylim3d()])
+        ax.set_zlim3d([z/scale for z in ax.get_zlim3d()])
+        fig.canvas.draw_idle()
+
+fig.canvas.mpl_connect('scroll_event', on_scroll)
 
 # Plot lens (cylinder along X-axis)
 theta = np.linspace(0, 2 * np.pi, 30)
@@ -101,10 +111,38 @@ y_cyl = R_lens * np.cos(theta_grid)
 z_cyl = R_lens * np.sin(theta_grid)
 ax.plot_surface(x_grid, y_cyl, z_cyl, alpha=0.2, color='red')
 
-# Plot trajectory (should be straight along X)
-ax.plot(positions_phys[:, 0], positions_phys[:, 1], positions_phys[:, 2], 'b-', lw=1)
-ax.set_xlabel('X (m)')
-ax.set_ylabel('Y (m)')
-ax.set_zlabel('Z (m)')
-ax.set_title('Electron Trajectory (On-Axis, No Deflection Expected)')
+# Plot trajectory
+line, = ax.plot([], [], [], 'b-', lw=1)
+
+# ====== VIEW CONTROL ======
+# 1. Set strict top-down view
+ax.view_init(elev=90, azim=-90)  # Perfect XY plane view
+
+# 2. Completely hide Z-axis grid
+ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))  # Transparent pane
+ax.zaxis._axinfo["grid"].update({"visible": False})  # Hide grid lines
+ax.set_zticks([])  # Remove tick marks
+
+# 3. Make XY plane more visible
+ax.xaxis.pane.fill = False
+ax.yaxis.pane.fill = False
+ax.xaxis._axinfo["grid"].update({"linewidth": 0.5})
+ax.yaxis._axinfo["grid"].update({"linewidth": 0.5})
+
+# 4. Set orthographic projection
+ax.set_proj_type('ortho')
+
+# Animation (same as before)
+def update(frame):
+    idx = (frame + 1) * skip_frames
+    if idx >= steps:
+        idx = steps - 1
+    line.set_data(positions_phys[:idx, 0], positions_phys[:idx, 1])
+    line.set_3d_properties(positions_phys[:idx, 2])
+    return line,
+
+ani = FuncAnimation(fig, update, frames=range(steps//skip_frames),
+                    interval=20, blit=False)
+
+plt.tight_layout()
 plt.show()
