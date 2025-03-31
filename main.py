@@ -21,7 +21,7 @@ class MainWindow(QMainWindow):
         """Initialize default values for all inputs"""
         # Electron parameters
         self.energySpinBox.setValue(1.0)  # MeV
-        self.posXSpinBox.setValue(-20.0)  # mm
+        self.posXSpinBox.setValue(-60.0)  # mm
         self.posYSpinBox.setValue(0.0)
         self.posZSpinBox.setValue(0.0)
         self.dirXSpinBox.setValue(1.0)
@@ -29,9 +29,9 @@ class MainWindow(QMainWindow):
         self.dirZSpinBox.setValue(0.0)
 
         # Lens parameters
-        self.gradientSpinBox.setValue(10.0)  # T/m
-        self.radiusSpinBox.setValue(5.0)  # mm
-        self.lengthSpinBox.setValue(10.0)  # mm
+        self.gradientSpinBox.setValue(1.0)  # T/m
+        self.radiusSpinBox.setValue(50.0)  # mm
+        self.lengthSpinBox.setValue(100.0)  # mm
 
     def launch_simulation(self):
         """Collect inputs and start simulation"""

@@ -42,8 +42,8 @@ class TrajectoryAnimation:
         # 3. Set lens parameters
         global R_lens, L_lens, k_phys
         k_phys = lens_params['gradient']
-        R_lens = lens_params['radius'] * 1e-3  # mm → m
-        L_lens = lens_params['length'] * 1e-3
+        R_lens = lens_params['radius']
+        L_lens = lens_params['length']
 
         # Rescale lens parameters
         R = R_lens / L0
