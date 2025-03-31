@@ -26,9 +26,9 @@ m_e = 1.0  # Mass (units of m_e)
 c = 1.0  # Speed of light (units of c)
 
 # ====== QUADRUPOLE LENS PARAMETERS ======
-R_lens = 5e-3  # Lens radius (5 mm)
-L_lens = 10e-3  # Lens length (10 mm)
-k_phys = 10.0  # Gradient (T/m)
+R_lens = 50e-3  # Lens radius (5 mm)
+L_lens = 100e-3  # Lens length (10 mm)
+k_phys = 1.0  # Gradient (T/m)
 
 # Rescale lens parameters
 R = R_lens / L0
@@ -54,7 +54,7 @@ def magnetic_field(x, y, z):
 
 # ====== INITIAL CONDITIONS ======
 v0_phys = np.array([0.99 * c_phys, 0.0, 0.0])  # Along X-axis
-r0_phys = np.array([-20e-3, 0.0, 0.0])  # Slightly off-axis
+r0_phys = np.array([-60e-3, 0.0, 0.0])  # Slightly off-axis
 
 # Convert to rescaled units
 v0 = v0_phys / c_phys
