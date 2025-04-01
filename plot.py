@@ -25,135 +25,148 @@ e = 1.0  # Charge (units of e)
 m_e = 1.0  # Mass (units of m_e)
 c = 1.0  # Speed of light (units of c)
 
-# ====== QUADRUPOLE LENS PARAMETERS ======
-R_lens = 50e-3  # Lens radius (5 mm)
-L_lens = 100e-3  # Lens length (10 mm)
-k_phys = 1.0  # Gradient (T/m)
+class TrajectoryAnimation:
+    def __init__(self):
+        self.ani = None
 
-# Rescale lens parameters
-R = R_lens / L0
-L = L_lens / L0
-k = k_phys / B0  # Rescaled gradient
+    def run_simulation(self, energy_MeV, direction, positions, lens_params):
+        """Run simulation with given parameters"""
+        # Convert energy to velocity (relativistic)
+        gamma = 1 + (energy_MeV * 1e6 * e_phys) / (m_e_phys * c_phys ** 2)
+        beta = np.sqrt(1 - 1 / gamma ** 2)  # v/c
 
+        # Calculate initial velocity vector
+        v0_phys = beta * c_phys * direction
+        r0_phys = positions
 
-def magnetic_field(x, y, z):
-    """Quadrupole field (X-axis aligned): B = (0, k*y, k*z)."""
-    x_abs = np.abs(x)
-    r = np.sqrt(y ** 2 + z ** 2)
-    if x_abs <= L / 2 and r <= R:
-        if np.allclose([y, z], [0.0, 0.0], atol=1e-15):
-            Bx, By, Bz = 0.0, 0.0, 0.0  # Enforce B=0 on-axis
-        else:
-            Bx = 0.0
-            By = k * y
-            Bz = k * z
-    else:
-        Bx, By, Bz = 0.0, 0.0, 0.0
-    return np.array([Bx, By, Bz])
+        # 3. Set lens parameters
+        global R_lens, L_lens, k_phys
+        k_phys = lens_params['gradient']
+        R_lens = lens_params['radius']
+        L_lens = lens_params['length']
 
+        # Rescale lens parameters
+        R = R_lens / L0
+        L = L_lens / L0
+        k = k_phys * L0 / B0  # Rescaled gradient
 
-# ====== INITIAL CONDITIONS ======
-v0_phys = np.array([0.99 * c_phys, 0.0, 0.0])  # Along X-axis
-r0_phys = np.array([-60e-3, 0.0, 0.0])  # Slightly off-axis
+        def magnetic_field(x, y, z):
+            """Quadrupole field (X-axis aligned): B = (0, k*y, k*z)."""
+            x_abs = np.abs(x)
+            r = np.sqrt(y ** 2 + z ** 2)
+            if x_abs <= L / 2 and r <= R:
+                if np.allclose([y, z], [0.0, 0.0], atol=1e-15):
+                    Bx, By, Bz = 0.0, 0.0, 0.0  # Enforce B=0 on-axis
+                else:
+                    Bx = 0.0
+                    By = -k * z
+                    Bz = -k * y
+            else:
+                Bx, By, Bz = 0.0, 0.0, 0.0
+            return np.array([Bx, By, Bz])
 
-# Convert to rescaled units
-v0 = v0_phys / c_phys
-r0 = r0_phys / L0
+        # Convert to rescaled units
+        v0 = v0_phys / c_phys
+        r0 = r0_phys / L0
 
-# ====== SIMULATION PARAMETERS ======
-dt_phys = 1e-13  # Time step (s)
-dt = dt_phys / T0  # Rescaled time step
-steps = 50000  # Number of steps
-skip_frames = 100  # Render every N steps
+        # ====== SIMULATION PARAMETERS ======
+        dt_phys = 1e-13  # Time step (s)
+        dt = dt_phys / T0  # Rescaled time step
+        steps = 50000  # Number of steps
+        skip_frames = 100  # Render every N steps
 
-# Arrays to store trajectory
-positions = np.zeros((steps, 3))
-velocities = np.zeros((steps, 3))
+        # Arrays to store trajectory
+        positions = np.zeros((steps, 3))
+        velocities = np.zeros((steps, 3))
 
-# Initialize
-positions[0] = r0
-velocities[0] = v0
+        # Initialize
+        positions[0] = r0
+        velocities[0] = v0
 
-# ====== MAIN LOOP ======
-for i in range(1, steps):
-    r = positions[i - 1]
-    v = velocities[i - 1]
+        # ====== MAIN LOOP ======
+        for i in range(1, steps):
+            r = positions[i - 1]
+            v = velocities[i - 1]
 
-    B = magnetic_field(*r)
-    gamma = 1 / np.sqrt(1 - np.linalg.norm(v) ** 2)
-    p = gamma * m_e * v
-    F = e * np.cross(v, B)
-    dp = F * dt
-    p_new = p + dp
-    gamma_new = np.sqrt(1 + np.linalg.norm(p_new) ** 2)
-    v_new = p_new / (gamma_new * m_e)
-    r_new = r + v_new * dt
+            B = magnetic_field(*r)
+            gamma = 1 / np.sqrt(1 - np.linalg.norm(v) ** 2)
+            p = gamma * m_e * v
+            F = -e * np.cross(v, B)
+            dp = F * dt
+            p_new = p + dp
+            gamma_new = np.sqrt(1 + np.linalg.norm(p_new) ** 2)  # Correct, but ensure p_new is updated properly
+            v_new = p_new / (gamma_new * m_e)  # m_e = 1 in rescaled units
+            r_new = r + v_new * dt
 
-    positions[i] = r_new
-    velocities[i] = v_new
+            positions[i] = r_new
+            velocities[i] = v_new
 
-# ====== CONVERT TO PHYSICAL UNITS ======
-positions_phys = positions * L0  # Convert to meters
+        # ====== CONVERT TO PHYSICAL UNITS ======
+        positions_phys = positions * L0  # Convert to meters
 
-# ====== VISUALIZATION SETUP ======
-fig = plt.figure(figsize=(10, 8))
-ax = fig.add_subplot(111, projection='3d')
+        # ====== VISUALIZATION SETUP ======
+        fig = plt.figure(figsize=(15, 8))
+        gs = fig.add_gridspec(2, 2)
 
-# Enable mouse wheel zoom by modifying the axes' event handling
-def on_scroll(event):
-    if event.inaxes == ax:
-        scale = 1.1 if event.button == 'up' else 1/1.1
-        ax.set_xlim3d([x/scale for x in ax.get_xlim3d()])
-        ax.set_ylim3d([y/scale for y in ax.get_ylim3d()])
-        ax.set_zlim3d([z/scale for z in ax.get_zlim3d()])
-        fig.canvas.draw_idle()
+        # 3D Plot
+        ax3d = fig.add_subplot(gs[:, 0], projection='3d')
 
-fig.canvas.mpl_connect('scroll_event', on_scroll)
+        # 2D Projection Plots
+        ax_yx = fig.add_subplot(gs[0, 1])
+        ax_zx = fig.add_subplot(gs[1, 1])
 
-# Plot lens (cylinder along X-axis)
-theta = np.linspace(0, 2 * np.pi, 30)
-x = np.linspace(-L_lens / 2, L_lens / 2, 10)
-theta_grid, x_grid = np.meshgrid(theta, x)
-y_cyl = R_lens * np.cos(theta_grid)
-z_cyl = R_lens * np.sin(theta_grid)
-ax.plot_surface(x_grid, y_cyl, z_cyl, alpha=0.2, color='red')
+        # Lens visualization (3D)
+        theta = np.linspace(0, 2 * np.pi, 30)
+        x = np.linspace(-L_lens / 2, L_lens / 2, 10)
+        theta_grid, x_grid = np.meshgrid(theta, x)
+        y_cyl = R_lens * np.cos(theta_grid)
+        z_cyl = R_lens * np.sin(theta_grid)
+        ax3d.plot_surface(x_grid, y_cyl, z_cyl, alpha=0.2, color='red')
 
-# Plot trajectory
-line, = ax.plot([], [], [], 'b-', lw=1)
+        # Lens visualization (2D projections)
+        for ax in [ax_yx, ax_zx]:
+            ax.axvspan(-L_lens / 2, L_lens / 2, color='red', alpha=0.1)
+            ax.grid(True)
 
-# ====== VIEW CONTROL ======
-# 1. Set strict top-down view
-ax.view_init(elev=90, azim=-90)  # Perfect XY plane view
+        # Plot limits
+        x_min = min(positions_phys[:, 0]) - 0.1
+        x_max = max(positions_phys[:, 0]) + 0.1
+        ax_yx.set_xlim(x_min, x_max)
+        ax_zx.set_xlim(x_min, x_max)
 
-if NO_Z_AXIS:
-    # 2. Completely hide Z-axis
-    ax.set_zticks([])  # Remove tick marks
-    ax.zaxis.line.set_color((1,1,1,0))  # Fully transparent Z-axis line
+        # Initialize plot elements
+        line3d, = ax3d.plot([], [], [], 'b-', lw=1)
+        line_yx, = ax_yx.plot([], [], 'b-', lw=1)
+        line_zx, = ax_zx.plot([], [], 'b-', lw=1)
 
-    # Hide grids
-    ax.grid(False)
+        # Labels
+        ax3d.set_xlabel('X (m)')
+        ax3d.set_ylabel('Y (m)')
+        ax3d.set_zlabel('Z (m)')
+        ax_yx.set_ylabel('Y (m)')
+        ax_zx.set_ylabel('Z (m)')
+        ax_zx.set_xlabel('X (m)')
+        ax_yx.set_title('Y-X Projection (Focusing Plane)')
+        ax_zx.set_title('Z-X Projection (Defocusing Plane)')
 
-    # 3. Make XY plane more visible
-    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))  # Hide YZ Plane
-    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))  # Hide XZ Plane
-    ax.zaxis.set_pane_color((0.9, 0.9, 0.9, 1.0))  # Make XY Plane visible
+        # Animation function
+        def update(frame):
+            idx = (frame + 1) * skip_frames
+            if idx >= steps:
+                idx = steps - 1
 
-    # 4. Set orthographic projection
-    ax.set_proj_type('ortho')
-#   grid = DynamicXYGrid(ax, fig)
+            # Update 3D plot
+            line3d.set_data(positions_phys[:idx, 0], positions_phys[:idx, 1])
+            line3d.set_3d_properties(positions_phys[:idx, 2])
 
-# Animation (same as before)
-def update(frame):
-    idx = (frame + 1) * skip_frames
-    if idx >= steps:
-        idx = steps - 1
-    line.set_data(positions_phys[:idx, 0], positions_phys[:idx, 1])
-    line.set_3d_properties(positions_phys[:idx, 2])
-    return line,
+            # Update 2D projections
+            line_yx.set_data(positions_phys[:idx, 0], positions_phys[:idx, 1])
+            line_zx.set_data(positions_phys[:idx, 0], positions_phys[:idx, 2])
 
-ani = FuncAnimation(fig, update, frames=range(steps//skip_frames),
-                    interval=20, blit=False)
-ax.set_xlabel("X", labelpad=15)  # Increased padding for 3D visibility
-ax.set_ylabel("Y", labelpad=15)
-plt.tight_layout()
-plt.show()
+            return line3d, line_yx, line_zx
+
+        self.ani = FuncAnimation(fig, update, frames=range(steps // skip_frames),
+                                 interval=20, blit=True)
+
+        plt.tight_layout()
+        plt.show()
