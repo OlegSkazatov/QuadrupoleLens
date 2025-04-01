@@ -48,7 +48,7 @@ class TrajectoryAnimation:
         # Rescale lens parameters
         R = R_lens / L0
         L = L_lens / L0
-        k = k_phys / B0  # Rescaled gradient
+        k = k_phys * L0 / B0  # Rescaled gradient
 
         def magnetic_field(x, y, z):
             """Quadrupole field (X-axis aligned): B = (0, k*y, k*z)."""
@@ -91,11 +91,11 @@ class TrajectoryAnimation:
             B = magnetic_field(*r)
             gamma = 1 / np.sqrt(1 - np.linalg.norm(v) ** 2)
             p = gamma * m_e * v
-            F = e * np.cross(v, B)
+            F = -e * np.cross(v, B)
             dp = F * dt
             p_new = p + dp
-            gamma_new = np.sqrt(1 + np.linalg.norm(p_new) ** 2)
-            v_new = p_new / (gamma_new * m_e)
+            gamma_new = np.sqrt(1 + np.linalg.norm(p_new) ** 2)  # Correct, but ensure p_new is updated properly
+            v_new = p_new / (gamma_new * m_e)  # m_e = 1 in rescaled units
             r_new = r + v_new * dt
 
             positions[i] = r_new
@@ -149,8 +149,6 @@ class TrajectoryAnimation:
 
             # 4. Set orthographic projection
             ax.set_proj_type('ortho')
-
-        #   grid = DynamicXYGrid(ax, fig) We'll get to custom grids later
 
         # Animation (same as before)
         def update(frame):
