@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import rcParams
-from axis import DynamicXYGrid
 
 # rcParams['toolbar'] = 'None'          # Hide toolbar
 rcParams['animation.embed_limit'] = 10  # Lower FPS during window drags
