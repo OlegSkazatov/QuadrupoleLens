@@ -59,8 +59,8 @@ class TrajectoryAnimation:
                     Bx, By, Bz = 0.0, 0.0, 0.0  # Enforce B=0 on-axis
                 else:
                     Bx = 0.0
-                    By = k * y
-                    Bz = k * z
+                    By = k * z
+                    Bz = k * y
             else:
                 Bx, By, Bz = 0.0, 0.0, 0.0
             return np.array([Bx, By, Bz])
@@ -105,63 +105,68 @@ class TrajectoryAnimation:
         positions_phys = positions * L0  # Convert to meters
 
         # ====== VISUALIZATION SETUP ======
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection='3d')
+        fig = plt.figure(figsize=(15, 8))
+        gs = fig.add_gridspec(2, 2)
 
-        # Enable mouse wheel zoom by modifying the axes' event handling
-        def on_scroll(event):
-            if event.inaxes == ax:
-                scale = 1.1 if event.button == 'up' else 1 / 1.1
-                ax.set_xlim3d([x / scale for x in ax.get_xlim3d()])
-                ax.set_ylim3d([y / scale for y in ax.get_ylim3d()])
-                ax.set_zlim3d([z / scale for z in ax.get_zlim3d()])
-                fig.canvas.draw_idle()
+        # 3D Plot
+        ax3d = fig.add_subplot(gs[:, 0], projection='3d')
 
-        fig.canvas.mpl_connect('scroll_event', on_scroll)
+        # 2D Projection Plots
+        ax_yx = fig.add_subplot(gs[0, 1])
+        ax_zx = fig.add_subplot(gs[1, 1])
 
-        # Plot lens (cylinder along X-axis)
+        # Lens visualization (3D)
         theta = np.linspace(0, 2 * np.pi, 30)
         x = np.linspace(-L_lens / 2, L_lens / 2, 10)
         theta_grid, x_grid = np.meshgrid(theta, x)
         y_cyl = R_lens * np.cos(theta_grid)
         z_cyl = R_lens * np.sin(theta_grid)
-        ax.plot_surface(x_grid, y_cyl, z_cyl, alpha=0.2, color='red')
+        ax3d.plot_surface(x_grid, y_cyl, z_cyl, alpha=0.2, color='red')
 
-        # Plot trajectory
-        line, = ax.plot([], [], [], 'b-', lw=1)
+        # Lens visualization (2D projections)
+        for ax in [ax_yx, ax_zx]:
+            ax.axvspan(-L_lens / 2, L_lens / 2, color='red', alpha=0.1)
+            ax.grid(True)
 
-        # ====== VIEW CONTROL ======
-        # 1. Set strict top-down view
-        ax.view_init(elev=90, azim=-90)  # Perfect XY plane view
+        # Plot limits
+        x_min = min(positions_phys[:, 0]) - 0.1
+        x_max = max(positions_phys[:, 0]) + 0.1
+        ax_yx.set_xlim(x_min, x_max)
+        ax_zx.set_xlim(x_min, x_max)
 
-        if NO_Z_AXIS:
-            # 2. Completely hide Z-axis
-            ax.set_zticks([])  # Remove tick marks
-            ax.zaxis.line.set_color((1, 1, 1, 0))  # Fully transparent Z-axis line
+        # Initialize plot elements
+        line3d, = ax3d.plot([], [], [], 'b-', lw=1)
+        line_yx, = ax_yx.plot([], [], 'b-', lw=1)
+        line_zx, = ax_zx.plot([], [], 'b-', lw=1)
 
-            # Hide grids
-            ax.grid(False)
+        # Labels
+        ax3d.set_xlabel('X (m)')
+        ax3d.set_ylabel('Y (m)')
+        ax3d.set_zlabel('Z (m)')
+        ax_yx.set_ylabel('Y (m)')
+        ax_zx.set_ylabel('Z (m)')
+        ax_zx.set_xlabel('X (m)')
+        ax_yx.set_title('Y-X Projection (Focusing Plane)')
+        ax_zx.set_title('Z-X Projection (Defocusing Plane)')
 
-            # 3. Make XY plane more visible
-            ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))  # Hide YZ Plane
-            ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))  # Hide XZ Plane
-            ax.zaxis.set_pane_color((0.9, 0.9, 0.9, 1.0))  # Make XY Plane visible
-
-            # 4. Set orthographic projection
-            ax.set_proj_type('ortho')
-
-        # Animation (same as before)
+        # Animation function
         def update(frame):
             idx = (frame + 1) * skip_frames
             if idx >= steps:
                 idx = steps - 1
-            line.set_data(positions_phys[:idx, 0], positions_phys[:idx, 1])
-            line.set_3d_properties(positions_phys[:idx, 2])
-            return line,
+
+            # Update 3D plot
+            line3d.set_data(positions_phys[:idx, 0], positions_phys[:idx, 1])
+            line3d.set_3d_properties(positions_phys[:idx, 2])
+
+            # Update 2D projections
+            line_yx.set_data(positions_phys[:idx, 0], positions_phys[:idx, 1])
+            line_zx.set_data(positions_phys[:idx, 0], positions_phys[:idx, 2])
+
+            return line3d, line_yx, line_zx
 
         self.ani = FuncAnimation(fig, update, frames=range(steps // skip_frames),
-                            interval=20, blit=False)
-        ax.set_xlabel("X", labelpad=15)  # Increased padding for 3D visibility
-        ax.set_ylabel("Y", labelpad=15)
+                                 interval=20, blit=True)
+
         plt.tight_layout()
         plt.show()
