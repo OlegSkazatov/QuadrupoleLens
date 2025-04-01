@@ -59,8 +59,8 @@ class TrajectoryAnimation:
                     Bx, By, Bz = 0.0, 0.0, 0.0  # Enforce B=0 on-axis
                 else:
                     Bx = 0.0
-                    By = k * z
-                    Bz = k * y
+                    By = -k * z
+                    Bz = -k * y
             else:
                 Bx, By, Bz = 0.0, 0.0, 0.0
             return np.array([Bx, By, Bz])
