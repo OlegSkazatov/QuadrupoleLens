@@ -30,10 +30,10 @@ class TrajectoryAnimation:
             return self._quadrupole_field(x, y, z, lens)
 
         # Численное интегрирование
-        trajectory = self._calculate_trajectory(r0, v0, gamma, field_func)
+        trajectory, x0 = self._calculate_trajectory(r0, v0, gamma, field_func)
 
         # Визуализация результатов
-        self._create_plots(trajectory, lens)
+        self._create_plots(trajectory, lens, x0)
 
     def _calculate_gamma(self, energy_MeV):
         """Расчет релятивистского фактора"""
@@ -53,7 +53,8 @@ class TrajectoryAnimation:
     def _calculate_trajectory(self, r0, v0, gamma, field_func):
         """Интегрирование уравнений движения"""
         # Параметры симуляции
-        steps = 50000
+        steps = 100000
+        x0 = 0
 
         # Инициализация массивов
         pos = np.zeros((steps, 3))
@@ -64,11 +65,11 @@ class TrajectoryAnimation:
         # Основной цикл
         for i in range(1, steps):
             B = field_func(*pos[i - 1])
-            F = -np.cross(vel[i - 1], B) # [кг * м/с^2 * 10000/ec]
+            F = -np.cross(vel[i - 1], B) # [кг * м/с^2 * 1000000/ec]
 
             # Релятивистское обновление импульса
             p = gamma * vel[i - 1]  # Текущий импульс [кг * м/c * 1/(me * c)]
-            dp = F * 1.758821e-7  # Изменение импульса
+            dp = F * 1.758821e-9  # Домножаем на e/me * 10^6, т.к. B в микротеслах
             p_new = p + dp
 
             # Пересчет скорости из нового импульса
@@ -78,11 +79,13 @@ class TrajectoryAnimation:
 
             # Обновление позиции
             pos[i] = pos[i - 1] + vel[i]
+            if pos[i][1] * pos[i-1][1] <= 0: # Фокус
+                x0 = (pos[i][0] + pos[i-1][0]) / 2 * L0
 
         pos = pos * L0
-        return pos[:i]  # Обрезаем массив до реального числа шагов
+        return pos[:i], x0  # Обрезаем массив до реального числа шагов
 
-    def _create_plots(self, trajectory, lens):
+    def _create_plots(self, trajectory, lens, x0):
         """Создание графиков и анимации"""
         fig = plt.figure(figsize=(15, 8))
         ax3d = fig.add_subplot(121, projection='3d')
@@ -97,12 +100,18 @@ class TrajectoryAnimation:
         line_yx, = ax_yx.plot([], [], 'b-')
         line_zx, = ax_zx.plot([], [], 'b-')
 
+        # Лимиты осей
+        ax_yx.set_xlim(trajectory[0][0] - 0.1, x0 + 0.1)
+        ax_yx.set_ylim(-lens['radius'], lens['radius'])
+        ax_zx.set_xlim(trajectory[0][0] - 0.1, x0 + 0.1)
+        ax_zx.set_ylim(-lens['radius'], lens['radius'])
+
         def update(frame):
             # Рассчитываем текущий индекс данных
             skip_frames = 500
             idx = (frame + 1) * skip_frames
 
-            # Обрезаем индекс до размера массива
+            # Обрезаем индекс до размера массиваx
             if idx >= len(trajectory):
                 idx = len(trajectory) - 1
 
