@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 
+from magnets import FieldCalculator
+
 c = 2.99792e8
 
 T0 = 1e-14 # Единица времени
@@ -14,9 +16,13 @@ L0 = c * T0 # Единица длины
 class TrajectoryAnimation:
     def __init__(self):
         self.ani = None
+        self.field_calculator = None
 
-    def run_simulation(self, energy_MeV, direction, position, lens):
+    def run_simulation(self, energy_MeV, direction, position, lenses):
         """Основной метод расчета траектории"""
+
+        self.field_calculator = FieldCalculator(lenses)
+
         # Релятивистские параметры
         gamma = self._calculate_gamma(energy_MeV)
         beta = np.sqrt(1 - 1 / gamma ** 2)
@@ -25,15 +31,15 @@ class TrajectoryAnimation:
         v0 = beta * direction
         r0 = position / L0
 
-        # Магнитное поле линзы
+        # Магнитное поле
         def field_func(x, y, z):
-            return self._quadrupole_field(x, y, z, lens)
+            return self.field_calculator.total_field(x, y, z)
 
         # Численное интегрирование
         trajectory, x0 = self._calculate_trajectory(r0, v0, gamma, field_func)
 
         # Визуализация результатов
-        self._create_plots(trajectory, lens, x0)
+        self._create_plots(trajectory, x0)
 
     def _calculate_gamma(self, energy_MeV):
         """Расчет релятивистского фактора"""
@@ -85,7 +91,7 @@ class TrajectoryAnimation:
         pos = pos * L0
         return pos[:i], x0  # Обрезаем массив до реального числа шагов
 
-    def _create_plots(self, trajectory, lens, x0):
+    def _create_plots(self, trajectory, x0):
         """Создание графиков и анимации"""
         fig = plt.figure(figsize=(15, 8))
         ax3d = fig.add_subplot(121, projection='3d')
@@ -93,7 +99,9 @@ class TrajectoryAnimation:
         ax_zx = fig.add_subplot(224)
 
         # Визуализация линзы
-        self._draw_lens(ax3d, ax_yx, ax_zx, lens)
+        if self.field_calculator is not None:
+            for lens in self.field_calculator.lenses:
+                lens.render_cylinder(ax3d) # Пока только на 3д
 
         # Настройка анимации
         line3d, = ax3d.plot([], [], [], 'b-')
@@ -101,10 +109,11 @@ class TrajectoryAnimation:
         line_zx, = ax_zx.plot([], [], 'b-')
 
         # Лимиты осей
+        lens = self.field_calculator.lenses[0]
         ax_yx.set_xlim(trajectory[0][0] - 0.1, x0 + 0.1)
-        ax_yx.set_ylim(-lens['radius'], lens['radius'])
+        ax_yx.set_ylim(-lens.radius, lens.radius)
         ax_zx.set_xlim(trajectory[0][0] - 0.1, x0 + 0.1)
-        ax_zx.set_ylim(-lens['radius'], lens['radius'])
+        ax_zx.set_ylim(-lens.radius, lens.radius)
 
         def update(frame):
             # Рассчитываем текущий индекс данных

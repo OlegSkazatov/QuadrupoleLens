@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.uic import loadUi
 import sys
 import numpy as np
+
+from magnets import QuadrupoleLens
 from plot import TrajectoryAnimation
 
 
@@ -39,10 +41,16 @@ class MainWindow(QMainWindow):
             energy = self.energySpinBox.value()
             direction = self._get_normalized_direction()
             position = self._get_position()
-            lens = self._get_lens_params()
 
+            # main_lens_params = self._get_lens_params()
+            # main_lens = QuadrupoleLens(main_lens_params['gradient'], main_lens_params['radius'],
+            #                            main_lens_params['length'])
+            # Тест 1: Две линзы вдоль оси X
+            lens1 = QuadrupoleLens(gradient=1.0, radius=0.05, length=0.1, position=(-0.3, 0, 0))
+            lens2 = QuadrupoleLens(gradient=-0.5, radius=0.03, length=0.2, position=(0.2, 0, 0))
+            lenses = [lens1, lens2]
             # Запуск симуляции
-            self.plotting.run_simulation(energy, direction, position, lens)
+            self.plotting.run_simulation(energy, direction, position, lenses)
 
         except Exception as e:
             self._show_error(str(e))
@@ -76,9 +84,12 @@ class MainWindow(QMainWindow):
         from PyQt5.QtWidgets import QMessageBox
         QMessageBox.warning(self, "Error", message)
 
+# def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
+#     sys.__excepthook__(cls, exception, traceback)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
+#    sys.excepthook = except_hook
     sys.exit(app.exec_())
