@@ -90,7 +90,7 @@ class TrajectoryAnimation:
         ax_zx = fig.add_subplot(224)
 
         # Визуализация линзы
-        self._draw_lens(ax3d, lens)
+        self._draw_lens(ax3d, ax_yx, ax_zx, lens)
 
         # Настройка анимации
         line3d, = ax3d.plot([], [], [], 'b-')
@@ -99,7 +99,7 @@ class TrajectoryAnimation:
 
         def update(frame):
             # Рассчитываем текущий индекс данных
-            skip_frames = 1000
+            skip_frames = 500
             idx = (frame + 1) * skip_frames
 
             # Обрезаем индекс до размера массива
@@ -120,7 +120,7 @@ class TrajectoryAnimation:
                                  interval=20, blit=True)
         plt.show()
 
-    def _draw_lens(self, ax, lens):
+    def _draw_lens(self, ax3d, ax_yx, ax_zx, lens):
         """Отрисовка 3D модели линзы"""
         R = lens['radius']
         L = lens['length']
@@ -136,12 +136,17 @@ class TrajectoryAnimation:
         z_cyl = R * np.sin(theta_grid)
 
         # Отрисовка поверхности
-        ax.plot_surface(x_cyl, y_cyl, z_cyl,
+        ax3d.plot_surface(x_cyl, y_cyl, z_cyl,
                         alpha=0.2,
                         color='red',
                         edgecolor='none')
 
+        # Отрисовка плоскости линзы в 2D
+        for ax in [ax_yx, ax_zx]:
+            ax.axvspan(-L / 2, L / 2, color='red', alpha=0.1)
+            ax.grid(True)
+
         # Добавление меток
-        ax.set_xlabel('Ось X (м)', labelpad=12)
-        ax.set_ylabel('Ось Y (м)', labelpad=12)
-        ax.set_zlabel('Ось Z (м)', labelpad=12)
+        ax3d.set_xlabel('Ось X (м)', labelpad=12)
+        ax3d.set_ylabel('Ось Y (м)', labelpad=12)
+        ax3d.set_zlabel('Ось Z (м)', labelpad=12)
