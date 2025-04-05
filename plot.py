@@ -4,11 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 
-# Физические константы
-e_phys = 1.602176634e-19  # Заряд электрона (Кл)
-m_e_phys = 9.1093837015e-31  # Масса электрона (кг)
-c_phys = 2.99792458e8  # Скорость света (м/с)
-
+# dt = 1e-14
+L0 = 3.33564097e5
 
 class TrajectoryAnimation:
     def __init__(self):
@@ -21,8 +18,8 @@ class TrajectoryAnimation:
         beta = np.sqrt(1 - 1 / gamma ** 2)
 
         # Начальные условия
-        v0 = beta * c_phys * direction
-        r0 = position
+        v0 = beta * direction
+        r0 = position * L0
 
         # Магнитное поле линзы
         def field_func(x, y, z):
@@ -36,13 +33,13 @@ class TrajectoryAnimation:
 
     def _calculate_gamma(self, energy_MeV):
         """Расчет релятивистского фактора"""
-        return 1 + (energy_MeV * 1e6 * e_phys) / (m_e_phys * c_phys ** 2)
+        return 1 + 1.95429*energy_MeV
 
     def _quadrupole_field(self, x, y, z, lens):
         """Магнитное поле квадруполя"""
-        k = lens['gradient'] * 1e-3 / 5.6856293  # Пересчет в безразмерные единицы
-        R = lens['radius']
-        L = lens['length']
+        k = lens['gradient'] / 0.333564097  # микроТеслы на L0
+        R = lens['radius'] * L0
+        L = lens['length'] * L0
 
         if abs(x) > L / 2 or y ** 2 + z ** 2 > R ** 2:
             return np.zeros(3)
