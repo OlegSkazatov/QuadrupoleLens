@@ -4,8 +4,12 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 
-# dt = 1e-14
-L0 = 3.33564097e5
+c = 2.99792e8
+
+T0 = 1e-14 # Единица времени
+L0 = c * T0 # Единица длины
+
+
 
 class TrajectoryAnimation:
     def __init__(self):
@@ -19,7 +23,7 @@ class TrajectoryAnimation:
 
         # Начальные условия
         v0 = beta * direction
-        r0 = position * L0
+        r0 = position / L0
 
         # Магнитное поле линзы
         def field_func(x, y, z):
@@ -37,9 +41,9 @@ class TrajectoryAnimation:
 
     def _quadrupole_field(self, x, y, z, lens):
         """Магнитное поле квадруполя"""
-        k = lens['gradient'] / 0.333564097  # микроТеслы на L0
-        R = lens['radius'] * L0
-        L = lens['length'] * L0
+        k = lens['gradient'] * L0 * 1e6 # мктеслы / L0
+        R = lens['radius'] / L0
+        L = lens['length'] / L0
 
         if abs(x) > L / 2 or y ** 2 + z ** 2 > R ** 2:
             return np.zeros(3)
@@ -49,7 +53,6 @@ class TrajectoryAnimation:
     def _calculate_trajectory(self, r0, v0, gamma, field_func):
         """Интегрирование уравнений движения"""
         # Параметры симуляции
-        dt = 1e-13  # Шаг времени (с)
         steps = 50000
 
         # Инициализация массивов
@@ -61,21 +64,22 @@ class TrajectoryAnimation:
         # Основной цикл
         for i in range(1, steps):
             B = field_func(*pos[i - 1])
-            F = -e_phys * np.cross(vel[i - 1], B)
+            F = -np.cross(vel[i - 1], B) # [кг * м/с^2 * 10000/ec]
 
             # Релятивистское обновление импульса
-            p = gamma * m_e_phys * vel[i - 1]  # Текущий импульс
-            F = -e_phys * np.cross(vel[i - 1], B)  # Сила Лоренца
-            dp = F * dt  # Изменение импульса
+            p = gamma * vel[i - 1]  # Текущий импульс [кг * м/c * 1/(me * c)]
+            dp = F * 1.758821e-7  # Изменение импульса
             p_new = p + dp
 
             # Пересчет скорости из нового импульса
-            gamma_new = np.sqrt(1 + (np.linalg.norm(p_new) / (m_e_phys * c_phys) ** 2))
-            vel[i] = p_new / (gamma_new * m_e_phys)
+            gamma_new = np.sqrt(1 + (np.linalg.norm(p_new)) ** 2)
+            beta_new = np.sqrt(1 - 1 / gamma_new ** 2)
+            vel[i] = p_new / np.linalg.norm(p_new) * beta_new
 
             # Обновление позиции
-            pos[i] = pos[i - 1] + vel[i] * dt
+            pos[i] = pos[i - 1] + vel[i]
 
+        pos = pos * L0
         return pos[:i]  # Обрезаем массив до реального числа шагов
 
     def _create_plots(self, trajectory, lens):
@@ -95,7 +99,7 @@ class TrajectoryAnimation:
 
         def update(frame):
             # Рассчитываем текущий индекс данных
-            skip_frames = 100
+            skip_frames = 1000
             idx = (frame + 1) * skip_frames
 
             # Обрезаем индекс до размера массива
