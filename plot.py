@@ -35,11 +35,38 @@ class TrajectoryAnimation:
         def field_func(x, y, z):
             return self.field_calculator.total_field(x, y, z)
 
+        bounds = self.field_calculator.get_system_bounds()
+
+        # Расчёт максимального линейного размера системы
+        system_size = max(
+            bounds['x_max'] - bounds['x_min'],
+            bounds['y_max'] - bounds['y_min'],
+            bounds['z_max'] - bounds['z_min']
+        )
+
+        # Учитываем начальную позицию электрона
+        electron_start_size = max(
+            abs(r0[0] * L0 - bounds['x_min']),
+            abs(r0[0] * L0 - bounds['x_max']),
+            abs(r0[1] * L0 - bounds['y_min']),
+            abs(r0[1] * L0 - bounds['y_max']),
+            abs(r0[2] * L0 - bounds['z_min']),
+            abs(r0[2] * L0 - bounds['z_max'])
+        )
+
+        total_path = system_size + electron_start_size
+
+        # Расчёт числа шагов
+        steps = int(total_path / L0)
+
+        # Ограничиваем минимальное и максимальное число шагов
+        steps = max(min(steps, 10 ** 6), 1000)
+
         # Численное интегрирование
-        trajectory, x0 = self._calculate_trajectory(r0, v0, gamma, field_func)
+        trajectory = self._calculate_trajectory(r0, v0, gamma, field_func, steps)
 
         # Визуализация результатов
-        self._create_plots(trajectory, x0)
+        self._create_plots(trajectory)
 
     def _calculate_gamma(self, energy_MeV):
         """Расчет релятивистского фактора"""
@@ -56,11 +83,9 @@ class TrajectoryAnimation:
 
         return np.array([0, -k * z, -k * y])  # Фокусировка в Y-направлении
 
-    def _calculate_trajectory(self, r0, v0, gamma, field_func):
+    def _calculate_trajectory(self, r0, v0, gamma, field_func, steps):
         """Интегрирование уравнений движения"""
         # Параметры симуляции
-        steps = 100000
-        x0 = 0
 
         # Инициализация массивов
         pos = np.zeros((steps, 3))
@@ -70,7 +95,7 @@ class TrajectoryAnimation:
 
         # Основной цикл
         for i in range(1, steps):
-            B = field_func(*pos[i - 1])
+            B = field_func(*pos[i - 1] * L0)
             F = -np.cross(vel[i - 1], B) # [кг * м/с^2 * 1000000/ec]
 
             # Релятивистское обновление импульса
@@ -85,23 +110,25 @@ class TrajectoryAnimation:
 
             # Обновление позиции
             pos[i] = pos[i - 1] + vel[i]
-            if pos[i][1] * pos[i-1][1] <= 0: # Фокус
-                x0 = (pos[i][0] + pos[i-1][0]) / 2 * L0
 
         pos = pos * L0
-        return pos[:i], x0  # Обрезаем массив до реального числа шагов
+        return pos[:i]  # Обрезаем массив до реального числа шагов
 
-    def _create_plots(self, trajectory, x0):
+    def _create_plots(self, trajectory):
         """Создание графиков и анимации"""
         fig = plt.figure(figsize=(15, 8))
         ax3d = fig.add_subplot(121, projection='3d')
         ax_yx = fig.add_subplot(222)
         ax_zx = fig.add_subplot(224)
+        ax_yx.grid(True)
+        ax_zx.grid(True)
 
         # Визуализация линзы
         if self.field_calculator is not None:
             for lens in self.field_calculator.lenses:
                 lens.render_cylinder(ax3d) # Пока только на 3д
+                lens.render_2d(ax_yx)
+                lens.render_2d(ax_zx)
 
         # Настройка анимации
         line3d, = ax3d.plot([], [], [], 'b-')
@@ -109,11 +136,18 @@ class TrajectoryAnimation:
         line_zx, = ax_zx.plot([], [], 'b-')
 
         # Лимиты осей
-        lens = self.field_calculator.lenses[0]
-        ax_yx.set_xlim(trajectory[0][0] - 0.1, x0 + 0.1)
-        ax_yx.set_ylim(-lens.radius, lens.radius)
-        ax_zx.set_xlim(trajectory[0][0] - 0.1, x0 + 0.1)
-        ax_zx.set_ylim(-lens.radius, lens.radius)
+        x1, x2 = trajectory[0][0], trajectory[-1][0]
+        r_max = max(list(map(lambda x: x.radius, self.field_calculator.lenses)))
+        if x2 > x1:
+            x1 = x1 - 0.05*(x2 - x1)
+            x2 = x2 + 0.05*(x2 - x1)
+        else:
+            x1 = x1 + 0.05 * (x2 - x1)
+            x2 = x2 - 0.05 * (x2 - x1)
+        ax_yx.set_xlim(x1, x2)
+        ax_yx.set_ylim(-r_max, r_max)
+        ax_zx.set_xlim(x1, x2)
+        ax_zx.set_ylim(-r_max, r_max)
 
         def update(frame):
             # Рассчитываем текущий индекс данных

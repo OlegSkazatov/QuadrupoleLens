@@ -55,6 +55,33 @@ class QuadrupoleLens:
                         points_global[..., 2],
                         alpha=0.2, color='red')
 
+    def render_2d(self, ax):
+        """Отрисовка прямоугольника в 2D"""
+        pass
+
+    def get_bounding_box(self):
+        """Возвращает минимальные и максимальные координаты линзы в глобальной системе"""
+        # Вершины цилиндра в локальной системе (X вдоль главной оси)
+        x = np.array([-self.length / 2, self.length / 2])
+        y = np.array([-self.radius, self.radius])
+        z = np.array([-self.radius, self.radius])
+
+        # Создаем сетку точек
+        points = np.array(np.meshgrid(x, y, z)).T.reshape(-1, 3)
+
+        # Преобразуем в глобальные координаты
+        global_points = (self.rot_matrix @ points.T).T + self.position
+
+        # Находим границы
+        return {
+            'x_min': np.min(global_points[:, 0]),
+            'x_max': np.max(global_points[:, 0]),
+            'y_min': np.min(global_points[:, 1]),
+            'y_max': np.max(global_points[:, 1]),
+            'z_min': np.min(global_points[:, 2]),
+            'z_max': np.max(global_points[:, 2])
+        }
+
 
 class FieldCalculator:
     def __init__(self, lenses: List[QuadrupoleLens]):
@@ -66,3 +93,22 @@ class FieldCalculator:
         for lens in self.lenses:
             B_total += lens.magnetic_field(x, y, z)
         return B_total
+
+    def get_system_bounds(self):
+        """Возвращает общие границы всей системы линз"""
+        bounds = {
+            'x_min': np.inf, 'x_max': -np.inf,
+            'y_min': np.inf, 'y_max': -np.inf,
+            'z_min': np.inf, 'z_max': -np.inf
+        }
+
+        for lens in self.lenses:
+            bb = lens.get_bounding_box()
+            bounds['x_min'] = min(bounds['x_min'], bb['x_min'])
+            bounds['x_max'] = max(bounds['x_max'], bb['x_max'])
+            bounds['y_min'] = min(bounds['y_min'], bb['y_min'])
+            bounds['y_max'] = max(bounds['y_max'], bb['y_max'])
+            bounds['z_min'] = min(bounds['z_min'], bb['z_min'])
+            bounds['z_max'] = max(bounds['z_max'], bb['z_max'])
+
+        return bounds
