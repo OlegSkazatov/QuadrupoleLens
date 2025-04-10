@@ -56,7 +56,7 @@ class TrajectoryAnimation:
 
         total_path = system_size + electron_start_size
 
-        # Расчёт числа шагов
+        # Расчёт числа шагов, исходя из размеров системы
         steps = int(total_path / L0)
 
         # Ограничиваем минимальное и максимальное число шагов

@@ -43,6 +43,8 @@ class MainWindow(QMainWindow):
             direction = self._get_normalized_direction()
             position = self._get_position()
 
+            # Различные конфигурации для тестов
+
             # Одна линза
             # main_lens_params = self._get_lens_params()
             # main_lens = QuadrupoleLens(main_lens_params['gradient'], main_lens_params['radius'],
