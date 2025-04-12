@@ -2,14 +2,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtWidgets import QProgressDialog
 from mpl_toolkits.mplot3d import Axes3D
 
 from magnets import FieldCalculator
 
 c = 2.99792e8
 
-T0 = 1e-14 # Единица времени
-L0 = c * T0 # Единица длины
+T0 = 1e-10  # Единица времени
+L0 = c * T0  # Единица длины
+
 
 def calculate_trajectory(r0, v0, gamma, field_func, steps):
     """Интегрирование уравнений движения"""
@@ -24,7 +27,7 @@ def calculate_trajectory(r0, v0, gamma, field_func, steps):
     # Основной цикл
     for i in range(1, steps):
         B = field_func(*pos[i - 1] * L0)
-        F = -np.cross(vel[i - 1], B) # [кг * м/с^2 * 1000000/ec]
+        F = -np.cross(vel[i - 1], B)  # [кг * м/с^2 * 1000000/ec]
 
         # Релятивистское обновление импульса
         p = gamma * vel[i - 1]  # Текущий импульс [кг * м/c * 1/(me * c)]
@@ -45,32 +48,26 @@ def calculate_trajectory(r0, v0, gamma, field_func, steps):
 
 def calculate_gamma(energy_MeV):
     """Расчет релятивистского фактора"""
-    return 1 + 1.95429*energy_MeV
+    return 1 + 1.95429 * energy_MeV
 
-class ElectronBeam:
-    def __init__(self):
-        self.field_calculator = None
 
-    def run_simulation(self, beam, num_samples=1000):
-        """Основной метод для симуляции пучка"""
-        try:
-            # Расчет траекторий для всех частиц
-            trajectories, weights = self._calculate_beam_trajectories(beam, num_samples)
+class BeamWorker(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(object, object)
+    error = pyqtSignal(str)
 
-            # Визуализация результатов
-            self._create_beam_plots(trajectories, weights)
+    def __init__(self, plotter, beam, num_samples=1000):
+        super().__init__()
+        self.plotter = plotter
+        self.beam = beam
+        self.num_samples = num_samples
 
-        except Exception as e:
-            print(f"Ошибка при расчете пучка: {str(e)}")
-            raise
-
-    def _calculate_beam_trajectories(self, beam, num_samples=1000):
-        """Расчёт траекторий для пучка с адаптивным steps"""
-        particles = beam.generate_particles(num_samples)
+    def run(self):
+        particles = self.beam.generate_particles(self.num_samples)
 
         # Получаем границы всей системы
-        lens_bounds = self.field_calculator.get_system_bounds()
-        beam_bounds = beam.get_bounding_box()
+        lens_bounds = self.plotter.field_calculator.get_system_bounds()
+        beam_bounds = self.beam.get_bounding_box()
 
         # Объединяем границы
         system_bounds = {
@@ -95,13 +92,16 @@ class ElectronBeam:
 
         # Корректировка шагов для каждой частицы
         trajectories = []
-        for i in range(num_samples):
+        total = len(particles['positions'])
+        for i in range(self.num_samples):
+            if self.isInterruptionRequested():
+                break
             # Расчёт индивидуального steps
             particle_pos = particles['positions'][i]
             min_dist = min(
                 np.linalg.norm(particle_pos - lens.position)
-                for lens in self.field_calculator.lenses
-            ) if self.field_calculator.lenses else system_size
+                for lens in self.plotter.field_calculator.lenses
+            ) if self.plotter.field_calculator.lenses else system_size
 
             adaptive_steps = int(min_dist / L0 * 1000)
             final_steps = min(adaptive_steps, steps)
@@ -109,17 +109,58 @@ class ElectronBeam:
             # Расчёт траектории
             gamma = calculate_gamma(particles['energies'][i])
             beta = np.sqrt(1 - 1 / gamma ** 2)
-            v0 = beta * beam.direction
+            v0 = beta * self.beam.direction
             trajectory = calculate_trajectory(
                 particles['positions'][i],
                 v0,
                 gamma,
-                lambda x, y, z: self.field_calculator.total_field(x, y, z),
+                lambda x, y, z: self.plotter.field_calculator.total_field(x, y, z),
                 steps=final_steps
             )
             trajectories.append(trajectory)
+            self.progress.emit(int((i + 1) / total * 100))
 
-        return trajectories, particles['weights']
+        self.finished.emit(trajectories, particles['weights'])
+
+
+class ElectronBeam:
+    def __init__(self):
+        self.field_calculator = None
+
+    def run_simulation(self, beam, num_samples=1000):
+        """Основной метод для симуляции пучка"""
+        try:
+            # Расчет траекторий для всех частиц
+            self._calculate_beam_trajectories(beam, num_samples=num_samples)
+
+        except Exception as e:
+            print(f"Ошибка при расчете пучка: {str(e)}")
+            raise
+
+    def _calculate_beam_trajectories(self, beam, num_samples=1000):
+        """Расчёт траекторий для пучка с адаптивным steps"""
+        # Создаем прогресс-диалог
+        self.progress_dialog = QProgressDialog(minimum=0, maximum=100,
+            labelText="Calculating beam trajectories..."
+        )
+        self.progress_dialog.setWindowTitle("Progress")
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+
+        # Создаем и настраиваем worker
+        self.beam_worker = BeamWorker(self, beam, num_samples=num_samples)
+        # Подключаем сигналы
+        self.beam_worker.progress.connect(self.progress_dialog.setValue)
+        self.beam_worker.finished.connect(self.on_beam_simulation_finished)
+        # self.beam_worker.error.connect(self._show_error)
+        self.progress_dialog.canceled.connect(self.beam_worker.requestInterruption)
+
+        # Запускаем
+        self.beam_worker.start()
+        self.progress_dialog.show()
+
+    def on_beam_simulation_finished(self, trajectories, weights):
+        self.progress_dialog.close()
+        self._create_beam_plots(trajectories, weights)
 
     def _create_beam_plots(self, trajectories, weights):
         """Визуализация для пучка"""
@@ -220,8 +261,8 @@ class SingleElectron:
         x1, x2 = trajectory[0][0], trajectory[-1][0]
         r_max = max(list(map(lambda x: x.radius, self.field_calculator.lenses)))
         if x2 > x1:
-            x1 = x1 - 0.05*(x2 - x1)
-            x2 = x2 + 0.05*(x2 - x1)
+            x1 = x1 - 0.05 * (x2 - x1)
+            x2 = x2 + 0.05 * (x2 - x1)
         else:
             x1 = x1 + 0.05 * (x2 - x1)
             x2 = x2 - 0.05 * (x2 - x1)

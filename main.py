@@ -2,8 +2,8 @@
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.uic import loadUi
 import sys
+import os
 import numpy as np
-from scipy.spatial.transform import Rotation
 
 from beam import Beam
 from magnets import QuadrupoleLens, FieldCalculator
@@ -13,7 +13,7 @@ from plot import SingleElectron, ElectronBeam
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        loadUi("ui/mainWindow.ui", self)
+        loadUi(os.path.sep.join(["ui", "mainWindow.ui"]), self)
 
         # Инициализация элементов управления
         self.runButton.clicked.connect(self.launch_simulation)
@@ -52,7 +52,8 @@ class MainWindow(QMainWindow):
             self.plotting.run_simulation(energy, direction, position)
 
         except Exception as e:
-            self._show_error(str(e))
+            pass
+            # self._show_error(str(e))
 
     def launch_beam_simulation(self):
         try:
@@ -77,11 +78,12 @@ class MainWindow(QMainWindow):
             self._load_magnetic_system()
             self.plotting.run_simulation(
                 beam,
-                num_samples=1000
+                num_samples=500
             )
 
         except Exception as e:
-            self._show_error(str(e))
+            pass
+            # self._show_error(str(e))
 
     def _load_magnetic_system(self):
         """Загрузка всех элементов магнитной системы"""
@@ -154,12 +156,13 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Error", message)
 
 
-# def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
-#     sys.__excepthook__(cls, exception, traceback)
+
+def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
+    sys.__excepthook__(cls, exception, traceback)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    #    sys.excepthook = except_hook
+    sys.excepthook = except_hook
     sys.exit(app.exec_())
