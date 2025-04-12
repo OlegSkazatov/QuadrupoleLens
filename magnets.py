@@ -1,3 +1,4 @@
+# magnets.py
 import numpy as np
 from scipy.spatial.transform import Rotation
 from typing import List

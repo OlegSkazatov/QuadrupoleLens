@@ -11,20 +11,147 @@ c = 2.99792e8
 T0 = 1e-14 # Единица времени
 L0 = c * T0 # Единица длины
 
+def calculate_trajectory(r0, v0, gamma, field_func, steps):
+    """Интегрирование уравнений движения"""
+    # Параметры симуляции
+
+    # Инициализация массивов
+    pos = np.zeros((steps, 3))
+    vel = np.zeros((steps, 3))
+    pos[0] = r0
+    vel[0] = v0
+
+    # Основной цикл
+    for i in range(1, steps):
+        B = field_func(*pos[i - 1] * L0)
+        F = -np.cross(vel[i - 1], B) # [кг * м/с^2 * 1000000/ec]
+
+        # Релятивистское обновление импульса
+        p = gamma * vel[i - 1]  # Текущий импульс [кг * м/c * 1/(me * c)]
+        dp = F * 1.758821e-9  # Домножаем на e/me * 10^6, т.к. B в микротеслах
+        p_new = p + dp
+
+        # Пересчет скорости из нового импульса
+        gamma_new = np.sqrt(1 + (np.linalg.norm(p_new)) ** 2)
+        beta_new = np.sqrt(1 - 1 / gamma_new ** 2)
+        vel[i] = p_new / np.linalg.norm(p_new) * beta_new
+
+        # Обновление позиции
+        pos[i] = pos[i - 1] + vel[i]
+
+    pos = pos * L0
+    return pos[:i]  # Обрезаем массив до реального числа шагов
 
 
-class TrajectoryAnimation:
+def calculate_gamma(energy_MeV):
+    """Расчет релятивистского фактора"""
+    return 1 + 1.95429*energy_MeV
+
+class ElectronBeam:
+    def __init__(self):
+        self.field_calculator = None
+
+    def run_simulation(self, beam, num_samples=1000):
+        """Основной метод для симуляции пучка"""
+        try:
+            # Расчет траекторий для всех частиц
+            trajectories, weights = self._calculate_beam_trajectories(beam, num_samples)
+
+            # Визуализация результатов
+            self._create_beam_plots(trajectories, weights)
+
+        except Exception as e:
+            print(f"Ошибка при расчете пучка: {str(e)}")
+            raise
+
+    def _calculate_beam_trajectories(self, beam, num_samples=1000):
+        """Расчёт траекторий для пучка с адаптивным steps"""
+        particles = beam.generate_particles(num_samples)
+
+        # Получаем границы всей системы
+        lens_bounds = self.field_calculator.get_system_bounds()
+        beam_bounds = beam.get_bounding_box()
+
+        # Объединяем границы
+        system_bounds = {
+            'x_min': min(lens_bounds['x_min'], beam_bounds['x_min']),
+            'x_max': max(lens_bounds['x_max'], beam_bounds['x_max']),
+            'y_min': min(lens_bounds['y_min'], beam_bounds['y_min']),
+            'y_max': max(lens_bounds['y_max'], beam_bounds['y_max']),
+            'z_min': min(lens_bounds['z_min'], beam_bounds['z_min']),
+            'z_max': max(lens_bounds['z_max'], beam_bounds['z_max'])
+        }
+
+        # Расчёт максимального линейного размера
+        system_size = max(
+            system_bounds['x_max'] - system_bounds['x_min'],
+            system_bounds['y_max'] - system_bounds['y_min'],
+            system_bounds['z_max'] - system_bounds['z_min']
+        )
+
+        # Вычисление базового числа шагов
+        steps = int(system_size / L0)
+        steps = max(min(steps, 10 ** 6), 1000)
+
+        # Корректировка шагов для каждой частицы
+        trajectories = []
+        for i in range(num_samples):
+            # Расчёт индивидуального steps
+            particle_pos = particles['positions'][i]
+            min_dist = min(
+                np.linalg.norm(particle_pos - lens.position)
+                for lens in self.field_calculator.lenses
+            ) if self.field_calculator.lenses else system_size
+
+            adaptive_steps = int(min_dist / L0 * 1000)
+            final_steps = min(adaptive_steps, steps)
+
+            # Расчёт траектории
+            gamma = calculate_gamma(particles['energies'][i])
+            beta = np.sqrt(1 - 1 / gamma ** 2)
+            v0 = beta * beam.direction
+            trajectory = calculate_trajectory(
+                particles['positions'][i],
+                v0,
+                gamma,
+                lambda x, y, z: self.field_calculator.total_field(x, y, z),
+                steps=final_steps
+            )
+            trajectories.append(trajectory)
+
+        return trajectories, particles['weights']
+
+    def _create_beam_plots(self, trajectories, weights):
+        """Визуализация для пучка"""
+        fig = plt.figure(figsize=(15, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Отрисовка с учётом весов частиц
+        for traj, w in zip(trajectories, weights):
+            alpha = 0.1 + 0.9 * (w / np.max(weights))
+            ax.plot(traj[:, 0], traj[:, 1], traj[:, 2],
+                    color='blue', alpha=alpha, linewidth=0.5)
+
+        # Отрисовка линз
+        if self.field_calculator:
+            for lens in self.field_calculator.lenses:
+                lens.render_cylinder(ax)
+
+        plt.show()
+
+
+class SingleElectron:
     def __init__(self):
         self.ani = None
         self.field_calculator = None
 
-    def run_simulation(self, energy_MeV, direction, position, lenses):
+    def run_simulation(self, energy_MeV, direction, position):
         """Основной метод расчета траектории"""
-
-        self.field_calculator = FieldCalculator(lenses)
+        if self.field_calculator is None:
+            self.field_calculator = FieldCalculator([])
 
         # Релятивистские параметры
-        gamma = self._calculate_gamma(energy_MeV)
+        gamma = calculate_gamma(energy_MeV)
         beta = np.sqrt(1 - 1 / gamma ** 2)
 
         # Начальные условия
@@ -63,56 +190,10 @@ class TrajectoryAnimation:
         steps = max(min(steps, 10 ** 6), 1000)
 
         # Численное интегрирование
-        trajectory = self._calculate_trajectory(r0, v0, gamma, field_func, steps)
+        trajectory = calculate_trajectory(r0, v0, gamma, field_func, steps)
 
         # Визуализация результатов
         self._create_plots(trajectory)
-
-    def _calculate_gamma(self, energy_MeV):
-        """Расчет релятивистского фактора"""
-        return 1 + 1.95429*energy_MeV
-
-    def _quadrupole_field(self, x, y, z, lens):
-        """Магнитное поле квадруполя"""
-        k = lens['gradient'] * L0 * 1e6 # мктеслы / L0
-        R = lens['radius'] / L0
-        L = lens['length'] / L0
-
-        if abs(x) > L / 2 or y ** 2 + z ** 2 > R ** 2:
-            return np.zeros(3)
-
-        return np.array([0, -k * z, -k * y])  # Фокусировка в Y-направлении
-
-    def _calculate_trajectory(self, r0, v0, gamma, field_func, steps):
-        """Интегрирование уравнений движения"""
-        # Параметры симуляции
-
-        # Инициализация массивов
-        pos = np.zeros((steps, 3))
-        vel = np.zeros((steps, 3))
-        pos[0] = r0
-        vel[0] = v0
-
-        # Основной цикл
-        for i in range(1, steps):
-            B = field_func(*pos[i - 1] * L0)
-            F = -np.cross(vel[i - 1], B) # [кг * м/с^2 * 1000000/ec]
-
-            # Релятивистское обновление импульса
-            p = gamma * vel[i - 1]  # Текущий импульс [кг * м/c * 1/(me * c)]
-            dp = F * 1.758821e-9  # Домножаем на e/me * 10^6, т.к. B в микротеслах
-            p_new = p + dp
-
-            # Пересчет скорости из нового импульса
-            gamma_new = np.sqrt(1 + (np.linalg.norm(p_new)) ** 2)
-            beta_new = np.sqrt(1 - 1 / gamma_new ** 2)
-            vel[i] = p_new / np.linalg.norm(p_new) * beta_new
-
-            # Обновление позиции
-            pos[i] = pos[i - 1] + vel[i]
-
-        pos = pos * L0
-        return pos[:i]  # Обрезаем массив до реального числа шагов
 
     def _create_plots(self, trajectory):
         """Создание графиков и анимации"""
@@ -126,7 +207,7 @@ class TrajectoryAnimation:
         # Визуализация линзы
         if self.field_calculator is not None:
             for lens in self.field_calculator.lenses:
-                lens.render_cylinder(ax3d) # Пока только на 3д
+                lens.render_cylinder(ax3d)
                 lens.render_2d(ax_yx)
                 lens.render_2d(ax_zx)
 
@@ -171,34 +252,3 @@ class TrajectoryAnimation:
         self.ani = FuncAnimation(fig, update, frames=range(len(trajectory) // 100),
                                  interval=20, blit=True)
         plt.show()
-
-    def _draw_lens(self, ax3d, ax_yx, ax_zx, lens):
-        """Отрисовка 3D модели линзы"""
-        R = lens['radius']
-        L = lens['length']
-
-        # Генерация цилиндрических координат
-        theta = np.linspace(0, 2 * np.pi, 30)
-        z = np.linspace(-L / 2, L / 2, 10)
-        theta_grid, z_grid = np.meshgrid(theta, z)
-
-        # Преобразование в декартовы координаты
-        x_cyl = z_grid
-        y_cyl = R * np.cos(theta_grid)
-        z_cyl = R * np.sin(theta_grid)
-
-        # Отрисовка поверхности
-        ax3d.plot_surface(x_cyl, y_cyl, z_cyl,
-                        alpha=0.2,
-                        color='red',
-                        edgecolor='none')
-
-        # Отрисовка плоскости линзы в 2D
-        for ax in [ax_yx, ax_zx]:
-            ax.axvspan(-L / 2, L / 2, color='red', alpha=0.1)
-            ax.grid(True)
-
-        # Добавление меток
-        ax3d.set_xlabel('Ось X (м)', labelpad=12)
-        ax3d.set_ylabel('Ось Y (м)', labelpad=12)
-        ax3d.set_zlabel('Ось Z (м)', labelpad=12)
