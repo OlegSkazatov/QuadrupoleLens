@@ -6,6 +6,9 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import QProgressDialog
 from mpl_toolkits.mplot3d import Axes3D
 from numpy.ma.core import log10
+from scipy.spatial import ConvexHull
+from matplotlib.patches import Ellipse
+import mpl_toolkits.mplot3d.art3d as art3d
 
 from magnets import FieldCalculator
 
@@ -171,19 +174,71 @@ class ElectronBeam:
         """Визуализация для пучка"""
         fig = plt.figure(figsize=(15, 8))
         ax = fig.add_subplot(111, projection='3d')
+        # # Отрисовка ВСЕХ траекторий (только для тестов)
+        # for traj, w in zip(trajectories, weights):
+        #     alpha = 0.1 + 0.9 * (w / np.max(weights))
+        #     ax.plot(traj[:, 0], traj[:, 1], traj[:, 2],
+        #             color='blue', alpha=alpha, linewidth=0.5)
 
-        # Отрисовка с учётом весов частиц
-        for traj, w in zip(trajectories, weights):
-            alpha = 0.1 + 0.9 * (w / np.max(weights))
-            ax.plot(traj[:, 0], traj[:, 1], traj[:, 2],
-                    color='blue', alpha=alpha, linewidth=0.5)
+        # 1. Визуализация оболочки пучка
+        all_points = np.concatenate(trajectories)
 
-        # Отрисовка линз
-        if self.field_calculator:
+        # Вычисление выпуклой оболочки
+        hull = ConvexHull(all_points)
+
+        # Отрисовка поверхности оболочки
+        ax.plot_trisurf(
+            all_points[:, 0],
+            all_points[:, 1],
+            all_points[:, 2],
+            triangles=hull.simplices,
+            alpha=0.5,
+            color='blue'
+        )
+
+        # 2. Визуализация медианной траектории
+        median_traj = np.median([traj for traj in trajectories], axis=0)
+        ax.plot(median_traj[:, 0], median_traj[:, 1], median_traj[:, 2], 'r-', lw=2)
+
+        # 3. Маркировка начального/конечного сечений
+        # self._draw_beam_section(ax, trajectories, 'start')
+        # self._draw_beam_section(ax, trajectories, 'end')
+
+        if self.field_calculator is not None:
             for lens in self.field_calculator.lenses:
                 lens.render_cylinder(ax)
 
         plt.show()
+
+    def _draw_beam_section(self, ax, trajectories, position='start'):
+        section_points = []
+        for traj in trajectories:
+            idx = 0 if position == 'start' else -1
+            section_points.append(traj[idx])
+
+        points = np.array(section_points)
+        y, z = points[:, 1], points[:, 2]
+
+        # Расчет эллипса
+        cov = np.cov(y, z)
+        lambda_, v = np.linalg.eig(cov)
+        angle = np.degrees(np.arctan2(*v[:, 0][::-1]))
+
+        ell = Ellipse(
+            (np.mean(y), np.mean(z)),
+            np.sqrt(5.991) * 2 * np.sqrt(lambda_[0]),
+            np.sqrt(5.991) * 2 * np.sqrt(lambda_[1]),
+            angle=angle,
+            color='green' if position == 'start' else 'red',
+            alpha=0.5
+        )
+
+        ax.add_patch(ell)
+        art3d.pathpatch_2d_to_3d(
+            ell,
+            z=np.mean([t[0 if position == 'start' else -1][0] for t in trajectories]),
+            zdir="x"
+        )
 
 
 class SingleElectron:
