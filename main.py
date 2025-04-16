@@ -64,9 +64,9 @@ class MainWindow(QMainWindow):
                 'position': self._get_beam_position(),
                 'direction': self._get_beam_direction(),
                 'ellipse': {
-                    'a': self.beamAxisASpinBox.value(),
-                    'b': self.beamAxisBSpinBox.value(),
-                    'theta': self.beamThetaSpinBox.value()
+                    'a': self.beamAxisASpinBox.value() * 1e-3,
+                    'b': self.beamAxisBSpinBox.value() * 1e-3,
+                    'theta': self.beamThetaSpinBox.value() / 180 * np.pi
                 },
                 'density_profile': self.densityProfileCombo.currentText(),
                 'energy_spread': self.energySpreadSpinBox.value() / 100

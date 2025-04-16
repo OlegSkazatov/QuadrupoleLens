@@ -10,7 +10,7 @@ from magnets import FieldCalculator
 
 c = 2.99792e8
 
-T0 = 1e-10  # Единица времени
+T0 = 1e-13  # Единица времени
 L0 = c * T0  # Единица длины
 
 
