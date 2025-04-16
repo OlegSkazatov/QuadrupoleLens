@@ -2,21 +2,24 @@
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.uic import loadUi
 import sys
+import os
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from magnets import QuadrupoleLens
-from plot import TrajectoryAnimation
+from beam import Beam
+from magnets import QuadrupoleLens, FieldCalculator
+from plot import SingleElectron, ElectronBeam
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        loadUi("ui/mainWindow.ui", self)
+        loadUi(os.path.sep.join(["ui", "mainWindow.ui"]), self)
 
         # Инициализация элементов управления
         self.runButton.clicked.connect(self.launch_simulation)
-        self.plotting = TrajectoryAnimation()
+        self.beamRunButton.clicked.connect(self.launch_beam_simulation)
+        self.plotting = None
         self._set_defaults()
 
     def _set_defaults(self):
@@ -42,31 +45,87 @@ class MainWindow(QMainWindow):
             energy = self.energySpinBox.value()
             direction = self._get_normalized_direction()
             position = self._get_position()
+            self.plotting = SingleElectron()
 
-            # Различные конфигурации для тестов
-
-            # Одна линза
-            # main_lens_params = self._get_lens_params()
-            # main_lens = QuadrupoleLens(main_lens_params['gradient'], main_lens_params['radius'],
-            #                            main_lens_params['length'])
-            # lenses = [main_lens]
-
-            # Тест 1: Две линзы вдоль оси X
-            # lens1 = QuadrupoleLens(gradient=6.0, radius=0.05, length=0.1, position=(-0.3, 0, 0))
-            # lens2 = QuadrupoleLens(gradient=6.0, radius=0.03, length=0.2, position=(0.2, 0, 0))
-            # lenses = [lens1, lens2]
-
-            # Тест 2: Чередуем фокус/дефокус
-            lens1 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0, 0, 0),
-                                   rotation=Rotation.identity())  # Стандартная ориентация
-            lens2 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0.15, 0, 0),
-                                   rotation=Rotation.from_euler('x', 90, degrees=True))  # Поворот на 90°
-            lenses = [lens1, lens2]
+            # Загружаем магнитную систему в калькулятор поля
+            self._load_magnetic_system()
             # Запуск симуляции
-            self.plotting.run_simulation(energy, direction, position, lenses)
+            self.plotting.run_simulation(energy, direction, position)
 
         except Exception as e:
-            self._show_error(str(e))
+            pass
+            # self._show_error(str(e))
+
+    def launch_beam_simulation(self):
+        try:
+            # Получение параметров из UI
+            beam_params = {
+                'energy': self.beamEnergySpinBox.value(),
+                'current': self.beamCurrentSpinBox.value(),
+                'position': self._get_beam_position(),
+                'direction': self._get_beam_direction(),
+                'ellipse': {
+                    'a': self.beamAxisASpinBox.value() * 1e-3,
+                    'b': self.beamAxisBSpinBox.value() * 1e-3,
+                    'theta': self.beamThetaSpinBox.value()
+                },
+                'density_profile': self.densityProfileCombo.currentText(),
+                'energy_spread': self.energySpreadSpinBox.value() / 100
+            }
+            # Создание пучка
+            beam = Beam(beam_params)
+            # Запуск симуляции
+            self.plotting = ElectronBeam()
+            self._load_magnetic_system()
+            self.plotting.run_simulation(
+                beam,
+                num_samples=500
+            )
+
+        except Exception as e:
+            pass
+            # self._show_error(str(e))
+
+    def _load_magnetic_system(self):
+        """Загрузка всех элементов магнитной системы"""
+        lenses = []
+        # Различные конфигурации для тестов
+
+        # # Одна линза
+        # main_lens_params = self._get_lens_params()
+        # main_lens = QuadrupoleLens(main_lens_params['gradient'], main_lens_params['radius'],
+        #                            main_lens_params['length'])
+        # lenses = [main_lens]
+
+        # Тест 1: Две линзы вдоль оси X
+        # lens1 = QuadrupoleLens(gradient=6.0, radius=0.05, length=0.1, position=(-0.3, 0, 0))
+        # lens2 = QuadrupoleLens(gradient=6.0, radius=0.03, length=0.2, position=(0.2, 0, 0))
+        # lenses = [lens1, lens2]
+
+        # Тест 2: Чередуем фокус/дефокус
+        lens1 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0, 0, 0),
+                               rotation=Rotation.identity())  # Стандартная ориентация
+        lens2 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0.15, 0, 0),
+                               rotation=Rotation.from_euler('x', 90, degrees=True))  # Поворот на 90°
+        lenses = [lens1, lens2]
+        if self.plotting is not None:
+            self.plotting.field_calculator = FieldCalculator(lenses)
+
+    def _get_beam_position(self):
+        """Координаты центра пучка"""
+        return np.array([self.beamPosXSpinBox.value() * 1e-3,
+                         self.beamPosYSpinBox.value() * 1e-3,
+                         self.beamPosZSpinBox.value() * 1e-3])
+
+    def _get_beam_direction(self):
+        """Направление пучка"""
+        vec = np.array([self.beamDirXSpinBox.value(),
+                        self.beamDirYSpinBox.value(),
+                        self.beamDirZSpinBox.value()])
+        norm = np.linalg.norm(vec)
+        if norm == 0:
+            raise ValueError("Нулевой вектор направления")
+        return vec / norm
 
     def _get_normalized_direction(self):
         """Нормализация вектора направления"""
@@ -98,12 +157,13 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Error", message)
 
 
-# def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
-#     sys.__excepthook__(cls, exception, traceback)
+
+def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
+    sys.__excepthook__(cls, exception, traceback)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    #    sys.excepthook = except_hook
+    sys.excepthook = except_hook
     sys.exit(app.exec_())
