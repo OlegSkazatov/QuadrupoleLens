@@ -5,12 +5,13 @@ from matplotlib.animation import FuncAnimation
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import QProgressDialog
 from mpl_toolkits.mplot3d import Axes3D
+from numpy.ma.core import log10
 
 from magnets import FieldCalculator
 
 c = 2.99792e8
 
-T0 = 1e-13  # Единица времени
+T0 = 1e-12  # Единица времени
 L0 = c * T0  # Единица длины
 
 
@@ -31,7 +32,7 @@ def calculate_trajectory(r0, v0, gamma, field_func, steps):
 
         # Релятивистское обновление импульса
         p = gamma * vel[i - 1]  # Текущий импульс [кг * м/c * 1/(me * c)]
-        dp = F * 1.758821e-9  # Домножаем на e/me * 10^6, т.к. B в микротеслах
+        dp = F * 1.758821 * 10 ** (log10(T0)-6+11)  # Домножаем на e/me * 10^6, т.к. B в микротеслах
         p_new = p + dp
 
         # Пересчет скорости из нового импульса
@@ -67,32 +68,37 @@ class BeamWorker(QThread):
 
         # Получаем границы всей системы
         lens_bounds = self.plotter.field_calculator.get_system_bounds()
-        beam_bounds = self.beam.get_bounding_box()
-
-        # Объединяем границы
-        system_bounds = {
-            'x_min': min(lens_bounds['x_min'], beam_bounds['x_min']),
-            'x_max': max(lens_bounds['x_max'], beam_bounds['x_max']),
-            'y_min': min(lens_bounds['y_min'], beam_bounds['y_min']),
-            'y_max': max(lens_bounds['y_max'], beam_bounds['y_max']),
-            'z_min': min(lens_bounds['z_min'], beam_bounds['z_min']),
-            'z_max': max(lens_bounds['z_max'], beam_bounds['z_max'])
-        }
-
-        # Расчёт максимального линейного размера
+        # beam_bounds = self.beam.get_bounding_box()
+        #
+        # # Объединяем границы
+        # system_bounds = {
+        #     'x_min': min(lens_bounds['x_min'], beam_bounds['x_min']),
+        #     'x_max': max(lens_bounds['x_max'], beam_bounds['x_max']),
+        #     'y_min': min(lens_bounds['y_min'], beam_bounds['y_min']),
+        #     'y_max': max(lens_bounds['y_max'], beam_bounds['y_max']),
+        #     'z_min': min(lens_bounds['z_min'], beam_bounds['z_min']),
+        #     'z_max': max(lens_bounds['z_max'], beam_bounds['z_max'])
+        # }
+        #
+        # # Расчёт максимального линейного размера
+        # system_size = max(
+        #     system_bounds['x_max'] - system_bounds['x_min'],
+        #     system_bounds['y_max'] - system_bounds['y_min'],
+        #     system_bounds['z_max'] - system_bounds['z_min']
+        # )
         system_size = max(
-            system_bounds['x_max'] - system_bounds['x_min'],
-            system_bounds['y_max'] - system_bounds['y_min'],
-            system_bounds['z_max'] - system_bounds['z_min']
-        )
+                lens_bounds['x_max'] - lens_bounds['x_min'],
+                lens_bounds['y_max'] - lens_bounds['y_min'],
+                lens_bounds['z_max'] - lens_bounds['z_min']
+            )
 
         # Вычисление базового числа шагов
         steps = int(system_size / L0)
+        print(steps)
         steps = max(min(steps, 10 ** 6), 1000)
 
         # Корректировка шагов для каждой частицы
         trajectories = []
-        total = len(particles['positions'])
         for i in range(self.num_samples):
             if self.isInterruptionRequested():
                 break
@@ -105,20 +111,20 @@ class BeamWorker(QThread):
 
             adaptive_steps = int(min_dist / L0 * 1000)
             final_steps = min(adaptive_steps, steps)
-
             # Расчёт траектории
             gamma = calculate_gamma(particles['energies'][i])
             beta = np.sqrt(1 - 1 / gamma ** 2)
             v0 = beta * self.beam.direction
+            positions = particles['positions'] / L0
             trajectory = calculate_trajectory(
-                particles['positions'][i],
+                positions[i],
                 v0,
                 gamma,
                 lambda x, y, z: self.plotter.field_calculator.total_field(x, y, z),
                 steps=final_steps
             )
             trajectories.append(trajectory)
-            self.progress.emit(int((i + 1) / total * 100))
+            self.progress.emit(int((i + 1) / self.num_samples * 100))
 
         self.finished.emit(trajectories, particles['weights'])
 

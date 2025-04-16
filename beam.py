@@ -1,17 +1,18 @@
 # beam.py
 
 import numpy as np
+from random import randint
 
 
 def calculate_rotation_matrix(direction):
     """Создаёт матрицу поворота из направления пучка"""
-    # Находим базис ортогональных векторов
     main_axis = direction / np.linalg.norm(direction)
     temp_vector = np.array([0, 0, 1]) if not np.allclose(main_axis, [0, 0, 1]) else np.array([1, 0, 0])
     second_axis = np.cross(main_axis, temp_vector)
     second_axis /= np.linalg.norm(second_axis)
     third_axis = np.cross(main_axis, second_axis)
-    return np.array([main_axis, second_axis, third_axis]).T
+    # Столбцы матрицы: second_axis (X_локальная), third_axis (Y_локальная), main_axis (Z_локальная)
+    return np.column_stack([second_axis, third_axis, main_axis])
 
 
 class Beam:
@@ -49,40 +50,35 @@ class Beam:
         else:  # constant
             phi = np.random.uniform(0, 2 * np.pi, num_samples)
             r = np.sqrt(np.random.uniform(0, 1, num_samples))
-            print(r[0], phi[0])
 
         # 2. Преобразование в эллиптические координаты
         x_beam = self.a * r * np.cos(phi)
         y_beam = self.b * r * np.sin(phi)
-        print(x_beam[0], y_beam[0])
 
-        # 3. Поворот в плоскости пучка
-        x_rot = x_beam * np.cos(self.theta) - y_beam * np.sin(self.theta)
-        y_rot = x_beam * np.sin(self.theta) + y_beam * np.cos(self.theta)
-        z_rot = np.zeros_like(x_rot)  # Начальное положение в плоскости
-        print(x_rot[0], y_rot[0])
+        # 3. Поворот в плоскости пучка (вокруг локальной Z)
+        rotation = np.array([
+            [np.cos(self.theta), -np.sin(self.theta), 0],
+            [np.sin(self.theta), np.cos(self.theta), 0],
+            [0, 0, 1]
+        ])
+        rotated_coords = rotation @ np.vstack([x_beam, y_beam, np.zeros_like(x_beam)])
 
-        # 4. Преобразование в глобальную систему координат
-        local_coords = np.vstack([x_rot, y_rot, z_rot])
-        global_coords = calculate_rotation_matrix(self.direction) @ local_coords
-        global_coords = global_coords.T + self.position
+        # 4. Преобразование в глобальную систему
+        rotation_matrix = calculate_rotation_matrix(self.direction)
+        global_coords = (rotation_matrix @ rotated_coords).T + self.position
 
-        # # 5. Добавление продольного разброса (вдоль направления пучка)
-        # longitudinal_spread = np.random.normal(0, self.a / 10, size=global_coords.shape[0])
-        # global_coords += longitudinal_spread[:, None] * self.direction
 
-        # 6. Расчёт весов частиц
+        # 5. Расчёт весов частиц
         if self.density_profile == 'gaussian':
             weights = np.exp(-0.5 * (r ** 2))  # Вес убывает от центра
         else:
             weights = np.ones_like(r)
 
-        # 7. Применение энергетического разброса
+        # 6. Применение энергетического разброса
         energies = self.energy * (1 + np.random.normal(
             scale=self.energy_spread,
             size=global_coords.shape[0]
         ))
-
         return {
             'positions': global_coords,
             'energies': energies,
@@ -104,12 +100,12 @@ class Beam:
         # Преобразование в глобальную систему
         global_points = (calculate_rotation_matrix(self.direction) @ points.T).T + self.position
 
-        # Учёт продольного разброса
-        longitudinal_offset = self.a / 10 * self.direction
-        global_points = np.vstack([
-            global_points + longitudinal_offset,
-            global_points - longitudinal_offset
-        ])
+        # # Учёт продольного разброса
+        # longitudinal_offset = self.a / 10 * self.direction
+        # global_points = np.vstack([
+        #     global_points + longitudinal_offset,
+        #     global_points - longitudinal_offset
+        # ])
 
         return {
             'x_min': np.min(global_points[:, 0]),
