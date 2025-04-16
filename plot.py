@@ -94,7 +94,6 @@ class BeamWorker(QThread):
 
         # Вычисление базового числа шагов
         steps = int(system_size / L0)
-        print(steps)
         steps = max(min(steps, 10 ** 6), 1000)
 
         # Корректировка шагов для каждой частицы

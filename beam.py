@@ -1,7 +1,6 @@
 # beam.py
 
 import numpy as np
-from random import randint
 
 
 def calculate_rotation_matrix(direction):
@@ -17,7 +16,6 @@ def calculate_rotation_matrix(direction):
 
 class Beam:
     def __init__(self, parameters):
-        print(parameters)
         self.energy = parameters['energy']  # Средняя энергия [МэВ]
         self.current = parameters['current']  # Ток пучка [мА]
         self.position = np.array(parameters['position'])  # Центр пучка [м]

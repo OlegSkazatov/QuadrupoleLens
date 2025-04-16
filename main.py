@@ -4,6 +4,7 @@ from PyQt5.uic import loadUi
 import sys
 import os
 import numpy as np
+from scipy.spatial.transform import Rotation
 
 from beam import Beam
 from magnets import QuadrupoleLens, FieldCalculator
@@ -90,23 +91,23 @@ class MainWindow(QMainWindow):
         lenses = []
         # Различные конфигурации для тестов
 
-        # Одна линза
-        main_lens_params = self._get_lens_params()
-        main_lens = QuadrupoleLens(main_lens_params['gradient'], main_lens_params['radius'],
-                                   main_lens_params['length'])
-        lenses = [main_lens]
+        # # Одна линза
+        # main_lens_params = self._get_lens_params()
+        # main_lens = QuadrupoleLens(main_lens_params['gradient'], main_lens_params['radius'],
+        #                            main_lens_params['length'])
+        # lenses = [main_lens]
 
         # Тест 1: Две линзы вдоль оси X
         # lens1 = QuadrupoleLens(gradient=6.0, radius=0.05, length=0.1, position=(-0.3, 0, 0))
         # lens2 = QuadrupoleLens(gradient=6.0, radius=0.03, length=0.2, position=(0.2, 0, 0))
         # lenses = [lens1, lens2]
 
-        # # Тест 2: Чередуем фокус/дефокус
-        # lens1 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0, 0, 0),
-        #                        rotation=Rotation.identity())  # Стандартная ориентация
-        # lens2 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0.15, 0, 0),
-        #                        rotation=Rotation.from_euler('x', 90, degrees=True))  # Поворот на 90°
-        # lenses = [lens1, lens2]
+        # Тест 2: Чередуем фокус/дефокус
+        lens1 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0, 0, 0),
+                               rotation=Rotation.identity())  # Стандартная ориентация
+        lens2 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0.15, 0, 0),
+                               rotation=Rotation.from_euler('x', 90, degrees=True))  # Поворот на 90°
+        lenses = [lens1, lens2]
         if self.plotting is not None:
             self.plotting.field_calculator = FieldCalculator(lenses)
 
