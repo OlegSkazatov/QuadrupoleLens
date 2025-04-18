@@ -24,6 +24,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.scene = QtWidgets.QGraphicsScene()
         self.canvas.setScene(self.scene)
         self.canvas.setFixedSize(600, 400)
+        self.scene.parent_window = self  # Явно связываем сцену с окном
         layout.addWidget(self.canvas, 70)  # 70% ширины
 
         # 2. Панель управления (правая панель)
@@ -201,33 +202,44 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
 
 
 class ElementParametersDialog(QtWidgets.QDialog):
-    def __init__(self, element_type):
+    def __init__(self, element):  # Изменяем аргумент на элемент
         super().__init__()
-        self.setup_ui(element_type)
+        self.element = element
+        self.setup_ui()
 
-    def setup_ui(self, element_type):
-        self.setWindowTitle(f"{element_type} Parameters")
+    def setup_ui(self):
+        self.setWindowTitle(f"{self.element.element_type} Parameters")
         layout = QtWidgets.QFormLayout(self)
 
         # Общие параметры
-        self.name_edit = QtWidgets.QLineEdit()
-        self.x_pos = QtWidgets.QDoubleSpinBox()
-        self.y_pos = QtWidgets.QDoubleSpinBox()
+        self.name_edit = QtWidgets.QLineEdit(self.element.name)
+        self.x_spin = QtWidgets.QDoubleSpinBox()
+        self.x_spin.setValue(self.element.x())
+        self.y_spin = QtWidgets.QDoubleSpinBox()
+        self.y_spin.setValue(self.element.y())
 
-        layout.addRow("Name:", self.name_edit)
-        layout.addRow("X Position [m]:", self.x_pos)
-        layout.addRow("Y Position [m]:", self.y_pos)
+        layout.addRow("Element name:", self.name_edit)
+        layout.addRow("X Position [m]:", self.x_spin)
+        layout.addRow("Y Position [m]:", self.y_spin)
 
-        # Параметры специфичные для типа
-        if element_type == "Quadrupole":
-            self.strength = QtWidgets.QDoubleSpinBox()
-            self.length = QtWidgets.QDoubleSpinBox()
-            layout.addRow("Strength [T/m]:", self.strength)
-            layout.addRow("Length [m]:", self.length)
+        # Параметры для квадруполя
+        if self.element.element_type == "Quadrupole":
+            self.gradient_spin = QtWidgets.QDoubleSpinBox()
+            self.gradient_spin.setRange(0, 1000)
+            self.gradient_spin.setValue(self.element.parameters.get('gradient', 0))
 
-        elif element_type == "Dipole":
-            # ... аналогично для других типов
-            pass
+            self.radius_spin = QtWidgets.QDoubleSpinBox()
+            self.radius_spin.setRange(0.01, 1.0)
+            self.radius_spin.setValue(self.element.parameters.get('radius', 0.1))
+
+            layout.addRow("Gradient [T/m]:", self.gradient_spin)
+            layout.addRow("Radius [m]:", self.radius_spin)
+
+        # Выбор цвета
+        self.color_btn = QtWidgets.QPushButton()
+        self.color_btn.setStyleSheet(f"background-color: {self.element.brush().color().name()}")
+        self.color_btn.clicked.connect(self.choose_color)
+        layout.addRow("Color:", self.color_btn)
 
         # Кнопки
         btn_box = QtWidgets.QDialogButtonBox(
@@ -237,29 +249,75 @@ class ElementParametersDialog(QtWidgets.QDialog):
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
 
+    def choose_color(self):
+        color = QtWidgets.QColorDialog.getColor()
+        if color.isValid():
+            self.color_btn.setStyleSheet(f"background-color: {color.name()}")
+
+    def get_values(self):
+        values = {
+            'name': self.name_edit.text(),
+            'x': self.x_spin.value(),
+            'y': self.y_spin.value(),
+            'color': self.color_btn.palette().button().color()
+        }
+
+        if self.element.element_type == "Quadrupole":
+            values.update({
+                'gradient': self.gradient_spin.value(),
+                'radius': self.radius_spin.value()
+            })
+
+        return values
+
 
 class CanvasElement(QtWidgets.QGraphicsRectItem):
     def __init__(self, x, y, element_type):
         super().__init__(0, 0, 40, 20)
         self.element_type = element_type
-        self.name = f"{element_type}_{id(self)}"  # Уникальное имя по умолчанию
+        self.name = f"{element_type}_{id(self)}"
+        self.parameters = {}  # Инициализируем хранилище параметров
+
+        # Инициализация параметров по умолчанию
+        if self.element_type == "Quadrupole":
+            self.parameters = {
+                'gradient': 10.0,  # T/m
+                'radius': 0.05  # m
+            }
+
         self.setPos(x, y)
         self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
-        self.setToolTip(f"{self.name}\n({x:.2f}, {y:.2f})")
+        self.setToolTip(self._update_tooltip())
+
+    def _update_tooltip(self):
+        params = "\n".join([f"{k}: {v}" for k, v in self.parameters.items()])
+        return f"{self.name}\n({self.x():.2f}, {self.y():.2f})\n{params}"
 
     def itemChange(self, change, value):
         if change == QtWidgets.QGraphicsItem.ItemPositionHasChanged:
-            # Обновляем подсказку
-            self.setToolTip(f"{self.name}\n({self.x():.2f}, {self.y():.2f})")
-            # Обновляем таблицу
-            if self.scene():
-                self.scene().parent().update_table()
+            scene = self.scene()
+            if scene and hasattr(scene, 'parent_window'):
+                scene.parent_window.update_table()
+            else:
+                main_window = self.get_main_window()
+                if main_window:
+                    main_window.update_table()
         return super().itemChange(change, value)
 
+    def get_main_window(self):
+        """Рекурсивно ищет главное окно в иерархии родителей"""
+        parent = self.parent()
+        while parent is not None:
+            if isinstance(parent, ElementEditorWindow):
+                return parent
+            parent = parent.parent()
+        return None
+
     def update_parameters(self, params):
-        """Обновляет параметры элемента"""
         self.name = params.get('name', self.name)
         self.setPos(params.get('x', self.x()), params.get('y', self.y()))
         self.setBrush(QtGui.QBrush(params.get('color', self.brush().color())))
+        self.parameters.update(params)  # Обновляем специфичные параметры
+        self.setToolTip(self._update_tooltip())
