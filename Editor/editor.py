@@ -8,6 +8,8 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Magnetic Optics Editor")
         self.parent = parent
         self.setup_ui()
+        self.setup_coordinate_label()
+        self.setup_grid_and_axes()
 
     def setup_ui(self):
         # Главный контейнер
@@ -62,6 +64,60 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             QTableWidget { font-size: 10pt; }
             QPushButton { padding: 5px; min-width: 80px; }
         """)
+
+    def setup_coordinate_label(self):
+        # Создаем статус бар для отображения координат
+        self.coord_label = QtWidgets.QLabel("X: 0.00, Y: 0.00")
+        self.statusBar().addPermanentWidget(self.coord_label)
+
+        # Подключаем отслеживание движения мыши
+        self.canvas.mouseMoveEvent = self.update_coord_label
+        self.canvas.setMouseTracking(True)
+
+    def update_coord_label(self, event):
+        """Обновляет координаты в статус баре"""
+        # Преобразуем координаты курсора в координаты сцены
+        scene_pos = self.canvas.mapToScene(event.pos())
+        self.coord_label.setText(f"X: {scene_pos.x():.2f}, Y: {scene_pos.y():.2f}")
+        event.accept()
+
+    def setup_grid_and_axes(self):
+        """Добавляет оси координат и сетку на схему"""
+        # Настройка сетки
+        grid_pen = QtGui.QPen(QtGui.QColor(200, 200, 200), 1, QtCore.Qt.DotLine)
+        for x in range(-500, 501, 50):
+            self.scene.addLine(x, -500, x, 500, grid_pen)
+        for y in range(-500, 501, 50):
+            self.scene.addLine(-500, y, 500, y, grid_pen)
+
+        # Оси координат
+        axis_pen = QtGui.QPen(QtCore.Qt.black, 2)
+        self.scene.addLine(-500, 0, 500, 0, axis_pen)  # X-axis
+        self.scene.addLine(0, -500, 0, 500, axis_pen)  # Y-axis
+
+        # Подписи осей
+        font = QtGui.QFont("Arial", 10)
+        self.scene.addText("X [m]", font).setPos(480, -20)
+        self.scene.addText("Y [m]", font).setPos(10, 480)
+
+    def open_parameters_dialog(self, element=None):
+        """Открывает диалог редактирования параметров элемента"""
+        if not element:
+            # Получаем выделенный элемент из таблицы
+            selected = self.table.selectedItems()
+            if not selected:
+                return
+            element = selected[0].data(QtCore.Qt.UserRole)
+
+        dialog = ElementParametersDialog(element)
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
+            new_params = dialog.get_values()
+            element.update_parameters(new_params)
+            self.update_table()
+
+            # Обновляем отображение элемента
+            element.setPos(new_params['x'], new_params['y'])
+            element.setBrush(QtGui.QBrush(new_params['color']))
 
     def update_table(self):
         """Обновляет таблицу элементов на основе объектов сцены"""
@@ -139,6 +195,10 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         }
         # Сохранение в JSON через QFileDialog
 
+    def wheelEvent(self, event):
+        factor = 1.2 if event.angleDelta().y() > 0 else 0.8
+        self.canvas.scale(factor, factor)
+
 
 class ElementParametersDialog(QtWidgets.QDialog):
     def __init__(self, element_type):
@@ -187,10 +247,13 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setToolTip(f"{self.name}\n({x:.2f}, {y:.2f})")
 
     def itemChange(self, change, value):
         if change == QtWidgets.QGraphicsItem.ItemPositionHasChanged:
-            # При перемещении элемента обновляем таблицу
+            # Обновляем подсказку
+            self.setToolTip(f"{self.name}\n({self.x():.2f}, {self.y():.2f})")
+            # Обновляем таблицу
             if self.scene():
                 self.scene().parent().update_table()
         return super().itemChange(change, value)
