@@ -24,7 +24,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="singleParticleTab">
        <attribute name="title">
@@ -217,97 +217,42 @@
              </property>
             </spacer>
            </item>
+           <item>
+            <widget class="QPushButton" name="runButton">
+             <property name="text">
+              <string>Run</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="resetButton">
+             <property name="text">
+              <string>Reset</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
         <item>
          <widget class="QGroupBox" name="lensGroup">
           <property name="title">
-           <string>Lens Parameters</string>
+           <string>Configuration</string>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
-            <widget class="QGroupBox" name="groupBox">
-             <property name="title">
-              <string>Parameters</string>
-             </property>
-             <layout class="QGridLayout" name="gridLayout_3">
-              <item row="0" column="0">
-               <widget class="QLabel" name="label_8">
-                <property name="text">
-                 <string>Gradient (T/m)</string>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="1">
-               <widget class="QDoubleSpinBox" name="gradientSpinBox">
-                <property name="minimum">
-                 <double>0.010000000000000</double>
-                </property>
-                <property name="maximum">
-                 <double>1000.000000000000000</double>
-                </property>
-                <property name="value">
-                 <double>1.000000000000000</double>
-                </property>
-               </widget>
-              </item>
-              <item row="1" column="0">
-               <widget class="QLabel" name="label_9">
-                <property name="text">
-                 <string>Radius (mm)</string>
-                </property>
-               </widget>
-              </item>
-              <item row="1" column="1">
-               <widget class="QDoubleSpinBox" name="radiusSpinBox">
-                <property name="minimum">
-                 <double>0.000000000000000</double>
-                </property>
-                <property name="maximum">
-                 <double>10000.000000000000000</double>
-                </property>
-                <property name="value">
-                 <double>50.000000000000000</double>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="0">
-               <widget class="QLabel" name="label_10">
-                <property name="text">
-                 <string>Length (mm)</string>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="1">
-               <widget class="QDoubleSpinBox" name="lengthSpinBox">
-                <property name="minimum">
-                 <double>0.000000000000000</double>
-                </property>
-                <property name="maximum">
-                 <double>10000.000000000000000</double>
-                </property>
-                <property name="value">
-                 <double>100.000000000000000</double>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </widget>
-           </item>
-           <item>
             <layout class="QVBoxLayout" name="verticalLayout_3">
              <item>
-              <widget class="QPushButton" name="runButton">
+              <widget class="QPushButton" name="saveButton">
                <property name="text">
-                <string>Run</string>
+                <string>Save configuration</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="resetButton">
+              <widget class="QPushButton" name="loadButton">
                <property name="text">
-                <string>Reset</string>
+                <string>Load configuration</string>
                </property>
               </widget>
              </item>
@@ -323,6 +268,13 @@
                 </size>
                </property>
               </spacer>
+             </item>
+             <item>
+              <widget class="QPushButton" name="openEditorButton">
+               <property name="text">
+                <string>Open editor</string>
+               </property>
+              </widget>
              </item>
             </layout>
            </item>
@@ -681,6 +633,36 @@
                <widget class="QPushButton" name="beamRunButton">
                 <property name="text">
                  <string>Run</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="groupBox">
+             <property name="title">
+              <string>Configuration</string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_6">
+              <item>
+               <widget class="QPushButton" name="beamSaveButton">
+                <property name="text">
+                 <string>Save configuration</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="beamLoadButton">
+                <property name="text">
+                 <string>Load configuration</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="beamOpenEditorButton">
+                <property name="text">
+                 <string>Open editor</string>
                 </property>
                </widget>
               </item>

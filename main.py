@@ -6,6 +6,7 @@ import os
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from Editor.editor import ElementEditorWindow
 from beam import Beam
 from magnets import QuadrupoleLens, FieldCalculator
 from plot import SingleElectron, ElectronBeam
@@ -19,7 +20,11 @@ class MainWindow(QMainWindow):
         # Инициализация элементов управления
         self.runButton.clicked.connect(self.launch_simulation)
         self.beamRunButton.clicked.connect(self.launch_beam_simulation)
+        self.resetButton.clicked.connect(self._set_defaults)
+        self.openEditorButton.clicked.connect(self.open_editor)
+        self.beamOpenEditorButton.clicked.connect(self.open_editor)
         self.plotting = None
+        self.editor_window = None
         self._set_defaults()
 
     def _set_defaults(self):
@@ -34,9 +39,9 @@ class MainWindow(QMainWindow):
         self.dirZSpinBox.setValue(0.0)
 
         # Параметры линзы
-        self.gradientSpinBox.setValue(1.0)  # Градиент (Т/м)
-        self.radiusSpinBox.setValue(50.0)  # Радиус (мм)
-        self.lengthSpinBox.setValue(100.0)  # Длина (мм)
+        # self.gradientSpinBox.setValue(1.0)  # Градиент (Т/м)
+        # self.radiusSpinBox.setValue(50.0)  # Радиус (мм)
+        # self.lengthSpinBox.setValue(100.0)  # Длина (мм)
 
     def launch_simulation(self):
         """Запуск расчета траектории"""
@@ -143,18 +148,16 @@ class MainWindow(QMainWindow):
                          self.posYSpinBox.value() * 1e-3,
                          self.posZSpinBox.value() * 1e-3])
 
-    def _get_lens_params(self):
-        """Параметры квадрупольной линзы"""
-        return {
-            'gradient': self.gradientSpinBox.value(),
-            'radius': self.radiusSpinBox.value() * 1e-3,
-            'length': self.lengthSpinBox.value() * 1e-3
-        }
-
     def _show_error(self, message):
         """Обработка исключений"""
         from PyQt5.QtWidgets import QMessageBox
         QMessageBox.warning(self, "Error", message)
+
+    def open_editor(self):
+        if self.editor_window is not None: return
+        self.editor_window = ElementEditorWindow(self)
+        self.editor_window.show()
+
 
 
 

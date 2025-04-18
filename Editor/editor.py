@@ -1,10 +1,12 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 
+
 class ElementEditorWindow(QtWidgets.QMainWindow):
-    def __init__(self):
+    def __init__(self, parent):
         super().__init__()
         self.setWindowTitle("Magnetic Optics Editor")
+        self.parent = parent
         self.setup_ui()
 
     def setup_ui(self):
@@ -41,6 +43,10 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.load_btn = QtWidgets.QPushButton("Load")
         self.set_btn = QtWidgets.QPushButton("Set Configuration")
 
+        self.add_btn.clicked.connect(self.add_element)
+        self.save_btn.clicked.connect(self.save_config)
+        self.table.itemDoubleClicked.connect(self.on_table_double_click)
+
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.remove_btn)
         right_panel.addWidget(self.save_btn)
@@ -57,6 +63,46 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             QPushButton { padding: 5px; min-width: 80px; }
         """)
 
+    def update_table(self):
+        """Обновляет таблицу элементов на основе объектов сцены"""
+        self.table.setRowCount(0)  # Очищаем таблицу
+
+        # Собираем только элементы типа CanvasElement
+        elements = [
+            item for item in self.scene.items()
+            if isinstance(item, CanvasElement)
+        ]
+
+        for idx, elem in enumerate(elements):
+            # Добавляем новую строку
+            self.table.insertRow(idx)
+
+            # Название элемента
+            name_item = QtWidgets.QTableWidgetItem(elem.name)
+            name_item.setData(QtCore.Qt.UserRole, elem)  # Сохраняем ссылку на элемент
+
+            # Тип элемента
+            type_item = QtWidgets.QTableWidgetItem(elem.element_type)
+
+            # Позиция в формате (X, Y)
+            pos = elem.scenePos()
+            pos_item = QtWidgets.QTableWidgetItem(f"({pos.x():.2f}, {pos.y():.2f})")
+
+            # Заполняем колонки
+            self.table.setItem(idx, 0, name_item)
+            self.table.setItem(idx, 1, type_item)
+            self.table.setItem(idx, 2, pos_item)
+
+            # Раскрашиваем строку в цвет элемента
+            color = elem.brush().color()
+            for col in range(3):
+                self.table.item(idx, col).setBackground(color)
+
+    def on_table_double_click(self, item):
+        """Открывает диалог редактирования при двойном клике по строке"""
+        elem = item.data(QtCore.Qt.UserRole)
+        self.open_parameters_dialog(elem)
+
     def show_context_menu(self, pos):
         menu = QtWidgets.QMenu()
         color_action = menu.addAction("Change Color")
@@ -67,6 +113,31 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             self.change_element_color()
         elif action == edit_action:
             self.open_parameters_dialog()
+
+    def add_element(self):
+        element_types = ["Quadrupole", "Dipole"]
+        type_dialog = QtWidgets.QInputDialog()
+        type_, ok = type_dialog.getItem(self, "Select Type", "Element type:", element_types)
+        if ok:
+            new_element = CanvasElement(0, 0, type_)
+            self.scene.addItem(new_element)
+            self.update_table()
+
+    def save_config(self):
+        config = {
+            "elements": [
+                {
+                    "type": elem.element_type,
+                    "x": elem.x(),
+                    "y": elem.y(),
+                    "color": elem.brush().color().name(),
+                    "params": elem.parameters
+                }
+                for elem in self.scene.items()
+                if isinstance(elem, CanvasElement)
+            ]
+        }
+        # Сохранение в JSON через QFileDialog
 
 
 class ElementParametersDialog(QtWidgets.QDialog):
@@ -105,3 +176,27 @@ class ElementParametersDialog(QtWidgets.QDialog):
         layout.addRow(btn_box)
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
+
+
+class CanvasElement(QtWidgets.QGraphicsRectItem):
+    def __init__(self, x, y, element_type):
+        super().__init__(0, 0, 40, 20)
+        self.element_type = element_type
+        self.name = f"{element_type}_{id(self)}"  # Уникальное имя по умолчанию
+        self.setPos(x, y)
+        self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
+        self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
+
+    def itemChange(self, change, value):
+        if change == QtWidgets.QGraphicsItem.ItemPositionHasChanged:
+            # При перемещении элемента обновляем таблицу
+            if self.scene():
+                self.scene().parent().update_table()
+        return super().itemChange(change, value)
+
+    def update_parameters(self, params):
+        """Обновляет параметры элемента"""
+        self.name = params.get('name', self.name)
+        self.setPos(params.get('x', self.x()), params.get('y', self.y()))
+        self.setBrush(QtGui.QBrush(params.get('color', self.brush().color())))
