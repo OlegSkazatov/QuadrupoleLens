@@ -32,8 +32,8 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         layout.addLayout(right_panel, 30)  # 30% ширины
 
         # Таблица элементов
-        self.table = QtWidgets.QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Name", "Type", "Position"])
+        self.table = QtWidgets.QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Name", "Type", "Position", "Color"])
         right_panel.addWidget(self.table)
 
         # Кнопки управления
@@ -122,42 +122,40 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
 
     def update_table(self):
         """Обновляет таблицу элементов на основе объектов сцены"""
-        self.table.setRowCount(0)  # Очищаем таблицу
-
-        # Собираем только элементы типа CanvasElement
+        self.table.setRowCount(0)
         elements = [
             item for item in self.scene.items()
             if isinstance(item, CanvasElement)
         ]
 
         for idx, elem in enumerate(elements):
-            # Добавляем новую строку
             self.table.insertRow(idx)
 
-            # Название элемента
+            # Name
             name_item = QtWidgets.QTableWidgetItem(elem.name)
-            name_item.setData(QtCore.Qt.UserRole, elem)  # Сохраняем ссылку на элемент
+            name_item.setData(QtCore.Qt.UserRole, elem)
+            self.table.setItem(idx, 0, name_item)
 
-            # Тип элемента
+            # Type
             type_item = QtWidgets.QTableWidgetItem(elem.element_type)
+            self.table.setItem(idx, 1, type_item)
 
-            # Позиция в формате (X, Y)
+            # Position
             pos = elem.scenePos()
             pos_item = QtWidgets.QTableWidgetItem(f"({pos.x():.2f}, {pos.y():.2f})")
-
-            # Заполняем колонки
-            self.table.setItem(idx, 0, name_item)
-            self.table.setItem(idx, 1, type_item)
             self.table.setItem(idx, 2, pos_item)
 
-            # Раскрашиваем строку в цвет элемента
-            color = elem.brush().color()
-            for col in range(3):
-                self.table.item(idx, col).setBackground(color)
+            # Color
+            color_item = QtWidgets.QTableWidgetItem()
+            color_item.setBackground(elem.brush().color())
+            self.table.setItem(idx, 3, color_item)
 
     def on_table_double_click(self, item):
         """Открывает диалог редактирования при двойном клике по строке"""
-        elem = item.data(QtCore.Qt.UserRole)
+        # Получаем элемент из первой колонки строки
+        row = item.row()
+        elem_item = self.table.item(row, 0)
+        elem = elem_item.data(QtCore.Qt.UserRole)
         self.open_parameters_dialog(elem)
 
     def show_context_menu(self, pos):
