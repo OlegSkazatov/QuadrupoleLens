@@ -63,6 +63,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.add_btn.clicked.connect(self.add_element)
         self.remove_btn.clicked.connect(self.remove_element)
         self.save_btn.clicked.connect(self.save_config)
+        self.load_btn.clicked.connect(self.load_config)
         self.table.itemDoubleClicked.connect(self.on_table_double_click)
 
         btn_layout.addWidget(self.add_btn)
@@ -279,6 +280,70 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
                 f"Не удалось сохранить файл:\n{str(e)}"
             )
 
+    def load_config(self):
+        """Загружает конфигурацию из JSON файла"""
+        options = QtWidgets.QFileDialog.Options()
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Load Configuration",
+            "",
+            "JSON Files (*.json)",
+            options=options
+        )
+
+        if not file_name:
+            return
+
+        try:
+            with open(file_name, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+            # Очищаем сцену
+            self.scene.clear()
+            self.grid_group = QtWidgets.QGraphicsItemGroup()
+            self.scene.addItem(self.grid_group)
+
+            # Создаем элементы
+            for elem_data in config.get('elements', []):
+                elem_type = elem_data['type']
+                x = elem_data['x'] * 10000  # Конвертация метров в пиксели
+                y = elem_data['y'] * 10000
+                color = QtGui.QColor(elem_data['color'])
+
+                # Создаем элемент
+                element = CanvasElement(x, y, elem_type, self, name=elem_data['parameters']['name'])
+                element.parameters = elem_data.get('parameters', {})
+
+                # Восстанавливаем параметры
+                element.setPos(x, y)
+                element.setBrush(QtGui.QBrush(color))
+
+                # Обновляем размеры
+                if elem_type == "Quadrupole":
+                    element.set_position(
+                        x, y,
+                        element.parameters.get('length', 0.2) * 10000,
+                        element.parameters.get('radius', 0.1) * 10000
+                    )
+                elif elem_type == "Dipole":
+                    element.set_position(
+                        x, y,
+                        element.parameters.get('width', 0.3) * 10000,
+                        element.parameters.get('length', 0.3) * 10000
+                    )
+
+                self.scene.addItem(element)
+
+            self.update_table()
+            self.update_grid()
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Ошибка загрузки",
+                f"Не удалось загрузить файл:\n{str(e)}"
+            )
+
     def wheelEvent(self, event):
         zoom_factor = 1.1  # Более плавное масштабирование
         if event.angleDelta().y() > 0:
@@ -460,7 +525,7 @@ class ElementParametersDialog(QtWidgets.QDialog):
 
 
 class CanvasElement(QtWidgets.QGraphicsRectItem):
-    def __init__(self, x, y, element_type, parent):
+    def __init__(self, x, y, element_type, parent, name=''):
         if element_type == "Quadrupole":
             super().__init__(x, y, 2000, 1000)
             self.set_position(x, y, 2000, 1000)
@@ -468,7 +533,10 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
             super().__init__(x, y, 3000, 3000)
             self.set_position(x, y, 3000, 3000)
         self.element_type = element_type
-        self.name = f"{element_type}_{id(self)}"
+        if name == '':
+            self.name = f"{element_type}_{id(self)}"
+        else:
+            self.name = name
         self.parent = parent
         self.parameters = {}  # Инициализируем хранилище параметров
         self.setTransformOriginPoint(self.rect().center())  # Центр для вращения
