@@ -1,3 +1,6 @@
+# editor.py
+
+import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 
@@ -8,8 +11,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Magnetic Optics Editor")
         self.parent = parent
         self.setup_ui()
-        self.setup_coordinate_label()
-        self.setup_grid_and_axes()
+        self.setup_grid()
 
     def setup_ui(self):
         # Главный контейнер
@@ -24,6 +26,16 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.scene = QtWidgets.QGraphicsScene()
         self.canvas.setScene(self.scene)
         self.canvas.setFixedSize(600, 400)
+        self.zoom_level = 1.0
+        self.base_grid_step = 0.1  # Базовый шаг сетки в метрах (10 см)
+        self.canvas.setRenderHint(QtGui.QPainter.Antialiasing)
+        self.canvas.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self.canvas.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        # Отключаем скролл-бары
+        self.canvas.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.canvas.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        # Настройки сцены
+        self.scene.setSceneRect(-1e5, -1e5, 2e5, 2e5)  # Большая сцена
         self.scene.parent_window = self  # Явно связываем сцену с окном
         layout.addWidget(self.canvas, 70)  # 70% ширины
 
@@ -75,6 +87,35 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.canvas.mouseMoveEvent = self.update_coord_label
         self.canvas.setMouseTracking(True)
 
+    def setup_navigation(self):
+        self.drag_mode = False
+        self.last_mouse_pos = QtCore.QPoint()
+
+        # Обработчики событий
+        self.canvas.mousePressEvent = self.canvas_mouse_press
+        self.canvas.mouseMoveEvent = self.canvas_mouse_move
+        self.canvas.mouseReleaseEvent = self.canvas_mouse_release
+
+    def canvas_mouse_press(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.drag_mode = True
+            self.last_mouse_pos = event.pos()
+            self.canvas.setCursor(QtCore.Qt.ClosedHandCursor)
+        super(QtWidgets.QGraphicsView, self.canvas).mousePressEvent(event)
+
+    def canvas_mouse_move(self, event):
+        if self.drag_mode:
+            delta = event.pos() - self.last_mouse_pos
+            self.last_mouse_pos = event.pos()
+            self.canvas.translate(delta.x(), delta.y())
+        super(QtWidgets.QGraphicsView, self.canvas).mouseMoveEvent(event)
+
+    def canvas_mouse_release(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.drag_mode = False
+            self.canvas.setCursor(QtCore.Qt.ArrowCursor)
+        super(QtWidgets.QGraphicsView, self.canvas).mouseReleaseEvent(event)
+
     def update_coord_label(self, event):
         """Обновляет координаты в статус баре"""
         # Преобразуем координаты курсора в координаты сцены
@@ -82,6 +123,12 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.coord_label.setText(f"X: {scene_pos.x():.2f}, Y: {scene_pos.y():.2f}")
         event.accept()
 
+    def setup_grid(self):
+        self.grid_group = QtWidgets.QGraphicsItemGroup()
+        self.scene.addItem(self.grid_group)
+        self.update_grid()
+
+    @DeprecationWarning
     def setup_grid_and_axes(self):
         """Добавляет оси координат и сетку на схему"""
         # Настройка сетки
@@ -195,8 +242,45 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         # Сохранение в JSON через QFileDialog
 
     def wheelEvent(self, event):
-        factor = 1.2 if event.angleDelta().y() > 0 else 0.8
-        self.canvas.scale(factor, factor)
+        zoom_factor = 1.1 if event.angleDelta().y() > 0 else 0.9
+        self.canvas.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self.canvas.scale(zoom_factor, zoom_factor)
+        self.update_grid()
+        event.accept()
+
+    def update_grid(self):
+        # Очищаем старую сетку
+        for item in self.grid_group.childItems():
+            self.grid_group.removeFromGroup(item)
+            self.scene.removeItem(item)
+
+        # Определяем шаг сетки в зависимости от масштаба
+        view_rect = self.canvas.mapToScene(self.canvas.viewport().geometry()).boundingRect()
+        visible_width = view_rect.width()
+
+        # Автоматический выбор шага сетки
+        steps = [0.001, 0.01, 0.1, 1, 10]  # 1mm, 1cm, 10cm, 1m, 10m
+        step = next((s for s in steps if visible_width / s < 50), steps[-1])
+
+        # Параметры отрисовки
+        pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 1.0)
+        bounds = 1000  # метров в каждую сторону
+
+        # Рисуем вертикальные линии
+        x = -bounds
+        while x <= bounds:
+            line = QtWidgets.QGraphicsLineItem(x, -bounds, x, bounds)
+            line.setPen(pen)
+            self.grid_group.addToGroup(line)
+            x += step
+
+        # Рисуем горизонтальные линии
+        y = -bounds
+        while y <= bounds:
+            line = QtWidgets.QGraphicsLineItem(-bounds, y, bounds, y)
+            line.setPen(pen)
+            self.grid_group.addToGroup(line)
+            y += step
 
 
 class ElementParametersDialog(QtWidgets.QDialog):
@@ -226,12 +310,17 @@ class ElementParametersDialog(QtWidgets.QDialog):
             self.gradient_spin.setRange(0, 1000)
             self.gradient_spin.setValue(self.element.parameters.get('gradient', 0))
 
+            self.length_spin = QtWidgets.QDoubleSpinBox()
+            self.length_spin.setRange(10, 10000)  # мм
+            self.length_spin.setValue(self.element.parameters.get('length_mm', 100))
+            layout.addRow("Length [mm]:", self.length_spin)
+
             self.radius_spin = QtWidgets.QDoubleSpinBox()
-            self.radius_spin.setRange(0.01, 1.0)
-            self.radius_spin.setValue(self.element.parameters.get('radius', 0.1))
+            self.radius_spin.setRange(10, 1000)  # мм
+            self.radius_spin.setValue(self.element.parameters.get('radius_mm', 50))
+            layout.addRow("Radius [mm]:", self.radius_spin)
 
             layout.addRow("Gradient [T/m]:", self.gradient_spin)
-            layout.addRow("Radius [m]:", self.radius_spin)
 
         # Выбор цвета
         self.color_btn = QtWidgets.QPushButton()
@@ -252,6 +341,8 @@ class ElementParametersDialog(QtWidgets.QDialog):
         if color.isValid():
             self.color_btn.setStyleSheet(f"background-color: {color.name()}")
 
+
+
     def get_values(self):
         values = {
             'name': self.name_edit.text(),
@@ -262,8 +353,8 @@ class ElementParametersDialog(QtWidgets.QDialog):
 
         if self.element.element_type == "Quadrupole":
             values.update({
-                'gradient': self.gradient_spin.value(),
-                'radius': self.radius_spin.value()
+                'length': self.length_spin.value() / 1000,  # Конвертация мм → м
+                'radius': self.radius_spin.value() / 1000
             })
 
         return values
@@ -275,6 +366,8 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         self.element_type = element_type
         self.name = f"{element_type}_{id(self)}"
         self.parameters = {}  # Инициализируем хранилище параметров
+        self.set_element_size(x, y)
+        self.setTransformOriginPoint(self.rect().center())  # Центр для вращения
 
         # Инициализация параметров по умолчанию
         if self.element_type == "Quadrupole":
@@ -319,3 +412,19 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         self.setBrush(QtGui.QBrush(params.get('color', self.brush().color())))
         self.parameters.update(params)  # Обновляем специфичные параметры
         self.setToolTip(self._update_tooltip())
+
+    def set_element_size(self, x, y):
+        """Обновляет размеры исходя из параметров"""
+        if self.element_type == "Quadrupole":
+            length = self.parameters.get('length', 0.1)  # в метрах
+            radius = self.parameters.get('radius', 0.05)
+
+            # Размеры в метрах → пиксели (1 м = 100 пикселей при базовом масштабе)
+            width = length * 100
+            height = radius * 2 * 100
+
+            self.setRect(-width / 2, -height / 2, width, height)  # Центр в (x,y)
+
+    def update_parameters(self, params):
+        if 'length' in params or 'radius' in params:
+            self.set_element_size(self.x(), self.y())
