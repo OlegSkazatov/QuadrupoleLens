@@ -135,6 +135,8 @@ class ElectronBeam:
         self.field_calculator = None
         self.show_3d = False
         self.show_cross_section = False
+        self.animation_fps = 1  # Частота кадров
+        self.cross_section_step = 50  # Шаг выборки точек
 
     def run_simulation(self, beam, num_samples=1000):
         """Основной метод для симуляции пучка"""
@@ -208,8 +210,70 @@ class ElectronBeam:
         # Отрисовка 3D графика при необходимости
         if self.show_3d:
             self._create_3d_plot(trajectories)
+        if self.show_cross_section:
+            self._create_cross_section_animation(trajectories)
 
         plt.tight_layout()
+        plt.show()
+
+    def _create_cross_section_animation(self, trajectories):
+        """Создание анимации поперечного сечения"""
+        # Подготовка данных
+        all_points = np.concatenate(trajectories)
+        num_frames = len(all_points) // self.cross_section_step
+        # Создание фигуры
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
+        ax.set_title('Поперечное сечение пучка (95% доверительный интервал)')
+        ax.set_xlabel('X (м)')
+        ax.set_ylabel('Y (м)')
+        ax.grid(True)
+        # Инициализация элементов анимации
+        scatter = ax.scatter([], [], s=1, alpha=0.3)
+        ellipse = ax.add_patch(Ellipse((0, 0), 0, 0, angle=0, color='r', fill=False, lw=2))
+        time_text = ax.text(0.05, 0.95, '', transform=ax.transAxes)
+
+        # Расчет границ для стабильной анимации
+        x = all_points[:, 0]
+        y = all_points[:, 1]
+        ax.set_xlim(x.min(), x.max())
+        ax.set_ylim(y.min(), y.max())
+        def animate(frame):
+            # Выборка данных для текущего кадра
+            idx = frame * self.cross_section_step
+            points = all_points[:idx]
+
+            # Обновление рассеяния
+            scatter.set_offsets(points[:, [0, 1]])
+
+            # Расчет эллипса
+            if len(points) > 10:
+                cov = np.cov(points[:, [0, 1]].T)
+                lambda_, v = np.linalg.eig(cov)
+                angle = np.degrees(np.arctan2(*v[:, 0][::-1]))
+
+                # Доверительный интервал 95% (хи-квадрат с 2 степенями свободы)
+                scale = np.sqrt(5.991)
+                width, height = 2 * scale * np.sqrt(lambda_)
+
+                # Обновление эллипса
+                ellipse.set_center(np.mean(points[:, [0, 1]], axis=0))
+                ellipse.set_width(width)
+                ellipse.set_height(height)
+                ellipse.set_angle(angle)
+
+            # Обновление времени
+            time_text.set_text(f'Шаг: {idx}/{len(all_points)}')
+            return scatter, ellipse, time_text
+
+        # Создание анимации
+        ani = FuncAnimation(
+            fig, animate,
+            frames=num_frames,
+            interval=1000 // self.animation_fps,
+            blit=True
+        )
+
         plt.show()
 
     def _plot_2d_projections(self, ax_xy, ax_xz, ax_yz, trajectories):
