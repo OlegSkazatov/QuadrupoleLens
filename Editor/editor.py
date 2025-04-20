@@ -4,7 +4,6 @@ import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 
-
 class ElementEditorWindow(QtWidgets.QMainWindow):
     def __init__(self, parent):
         super().__init__()
@@ -140,12 +139,10 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             self.canvas.setCursor(QtCore.Qt.ArrowCursor)
         super(QtWidgets.QGraphicsView, self.canvas).mouseReleaseEvent(event)
 
-
     def setup_grid(self):
         self.grid_group = QtWidgets.QGraphicsItemGroup()
         self.scene.addItem(self.grid_group)
         self.update_grid()
-
 
     def open_parameters_dialog(self, element=None):
         """Открывает диалог редактирования параметров элемента"""
@@ -162,9 +159,6 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             element.update_parameters(new_params)
             self.update_table()
 
-            # Обновляем отображение элемента
-            element.setPos(new_params['x'], new_params['y'])
-            element.setBrush(QtGui.QBrush(new_params['color']))
 
     def update_table(self):
         """Обновляет таблицу элементов на основе объектов сцены"""
@@ -188,7 +182,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
 
             # Position
             pos = elem.scenePos()
-            pos_item = QtWidgets.QTableWidgetItem(f"({pos.x():.2f}, {pos.y():.2f})")
+            pos_item = QtWidgets.QTableWidgetItem(f"({pos.x() / 10000:.2f}, {pos.y() / 10000:.2f})")
             self.table.setItem(idx, 2, pos_item)
 
             # Color
@@ -264,6 +258,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
 
         # Определяем шаг сетки в зависимости от масштаба
         view_rect = self.canvas.mapToScene(self.canvas.viewport().geometry()).boundingRect()
+
         visible_width = view_rect.width()
 
         # Автоматический выбор шага сетки
@@ -273,34 +268,33 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
                 step = s
                 break
         else:
-            return # Убираем сетку, если вышли за пределы
+            return  # Убираем сетку, если вышли за пределы
+        x0, y0 = view_rect.x() + view_rect.width() / 2, view_rect.y() + view_rect.height() / 2
         # Параметры отрисовки
         pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 1.0 * step / 20)
         bounds = visible_width * 1.1
-
-        # Рисуем вертикальные линии
-        x = 0
         border = bounds // step * step
-        while x <= border:
-            line1 = QtWidgets.QGraphicsLineItem(x, -border, x, border)
-            line2 = QtWidgets.QGraphicsLineItem(-x, -border, -x, border)
+        num_x, num_y = 0, 0
+        # Рисуем вертикальные линии
+        while num_x <= border // step:
+            line1 = QtWidgets.QGraphicsLineItem(x0 + step * num_x, y0 - border, x0 + step * num_x, y0 + border)
+            line2 = QtWidgets.QGraphicsLineItem(x0 - step * num_x, y0 - border, x0 - step * num_x, y0 + border)
 
             line1.setPen(pen)
             line2.setPen(pen)
             self.grid_group.addToGroup(line1)
             self.grid_group.addToGroup(line2)
-            x += step
+            num_x += 1
 
         # Рисуем горизонтальные линии
-        y = 0
-        while y <= border:
-            line1 = QtWidgets.QGraphicsLineItem(-border, y, border, y)
-            line2 = QtWidgets.QGraphicsLineItem(-border, -y, border, -y)
+        while num_y <= border // step:
+            line1 = QtWidgets.QGraphicsLineItem(x0 - border, y0 + step*num_y, x0 + border, y0 + step*num_y)
+            line2 = QtWidgets.QGraphicsLineItem(x0 - border, y0 - step*num_y, x0 + border, y0 - step*num_y)
             line1.setPen(pen)
             line2.setPen(pen)
             self.grid_group.addToGroup(line1)
             self.grid_group.addToGroup(line2)
-            y += step
+            num_y += 1
 
 
 class ElementParametersDialog(QtWidgets.QDialog):
@@ -316,9 +310,11 @@ class ElementParametersDialog(QtWidgets.QDialog):
         # Общие параметры
         self.name_edit = QtWidgets.QLineEdit(self.element.name)
         self.x_spin = QtWidgets.QDoubleSpinBox()
-        self.x_spin.setValue(self.element.x())
+        self.x_spin.setValue(self.element.parameters.get('x'))
+        self.x_spin.setRange(-20, 20)
         self.y_spin = QtWidgets.QDoubleSpinBox()
-        self.y_spin.setValue(self.element.y())
+        self.y_spin.setValue(self.element.parameters.get('y'))
+        self.y_spin.setRange(-20, 20)
 
         layout.addRow("Element name:", self.name_edit)
         layout.addRow("X Position [m]:", self.x_spin)
@@ -328,16 +324,16 @@ class ElementParametersDialog(QtWidgets.QDialog):
         if self.element.element_type == "Quadrupole":
             self.gradient_spin = QtWidgets.QDoubleSpinBox()
             self.gradient_spin.setRange(0, 1000)
-            self.gradient_spin.setValue(self.element.parameters.get('gradient', 0))
+            self.gradient_spin.setValue(self.element.parameters.get('gradient'))
 
             self.length_spin = QtWidgets.QDoubleSpinBox()
-            self.length_spin.setRange(10, 10000)  # мм
-            self.length_spin.setValue(self.element.parameters.get('length_mm', 100))
+            self.length_spin.setRange(1, 10000)  # мм
+            self.length_spin.setValue(self.element.parameters.get('length') * 1000)
             layout.addRow("Length [mm]:", self.length_spin)
 
             self.radius_spin = QtWidgets.QDoubleSpinBox()
-            self.radius_spin.setRange(10, 1000)  # мм
-            self.radius_spin.setValue(self.element.parameters.get('radius_mm', 50))
+            self.radius_spin.setRange(1, 10000)  # мм
+            self.radius_spin.setValue(self.element.parameters.get('radius') * 1000)
             layout.addRow("Radius [mm]:", self.radius_spin)
 
             layout.addRow("Gradient [T/m]:", self.gradient_spin)
@@ -361,8 +357,6 @@ class ElementParametersDialog(QtWidgets.QDialog):
         if color.isValid():
             self.color_btn.setStyleSheet(f"background-color: {color.name()}")
 
-
-
     def get_values(self):
         values = {
             'name': self.name_edit.text(),
@@ -374,7 +368,8 @@ class ElementParametersDialog(QtWidgets.QDialog):
         if self.element.element_type == "Quadrupole":
             values.update({
                 'length': self.length_spin.value() / 1000,  # Конвертация мм → м
-                'radius': self.radius_spin.value() / 1000
+                'radius': self.radius_spin.value() / 1000,
+                'gradient': self.gradient_spin.value()
             })
 
         return values
@@ -388,14 +383,17 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         self.parent = parent
         self.parameters = {}  # Инициализируем хранилище параметров
         self.setTransformOriginPoint(self.rect().center())  # Центр для вращения
-        self.setPos(x, y)
+        self.set_position(x, y, 2000, 1000)
 
         # Инициализация параметров по умолчанию
         if self.element_type == "Quadrupole":
             self.parameters = {
+                'name': self.name,
+                'x': 0,
+                'y': 0,
                 'gradient': 1.0,  # T/m
                 'radius': 0.1,  # m
-                'length': 0.2 # m
+                'length': 0.2  # m
             }
 
         self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
@@ -429,23 +427,14 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
 
     def update_parameters(self, params):
         self.name = params.get('name', self.name)
-        self.setPos(params.get('x', self.x()), params.get('y', self.y()))
-        self.setBrush(QtGui.QBrush(params.get('color', self.brush().color())))
-        self.parameters.update(params)  # Обновляем специфичные параметры
+        if self.element_type == 'Quadrupole':
+            self.set_position(params['x'] * 10000, params['y'] * 10000, params['length'] * 10000,
+                                  params['radius'] * 10000)  # Обновляем размеры
+        self.setBrush(QtGui.QBrush(params['color']))
+        self.parameters.update(params)
         self.setToolTip(self._update_tooltip())
+        print(self.x(), self.y())
 
-    def set_element_size(self, x, y):
-        """Обновляет размеры исходя из параметров"""
-        if self.element_type == "Quadrupole":
-            length = self.parameters.get('length', 0.1)  # в метрах
-            radius = self.parameters.get('radius', 0.05)
-
-            # Размеры в метрах → пиксели (1 м = 100 пикселей при базовом масштабе)
-            width = length * 100
-            height = radius * 2 * 100
-
-            self.setRect(-width / 2, -height / 2, width, height)  # Центр в (x,y)
-
-    def update_parameters(self, params):
-        if 'length' in params or 'radius' in params:
-            self.set_element_size(self.x(), self.y())
+    def set_position(self, x, y, w, h, rotation=0):
+        self.setPos(x, y)
+        self.setRect(-w / 2, -h / 2, w, h)
