@@ -436,14 +436,14 @@ class ElementParametersDialog(QtWidgets.QDialog):
         self.y_spin = QtWidgets.QDoubleSpinBox()
         self.y_spin.setRange(-20, 20)
         self.y_spin.setValue(self.element.parameters.get('y'))
-        self.rotation_spin = QtWidgets.QDoubleSpinBox()
-        self.rotation_spin.setRange(-360, 360)
-        self.rotation_spin.setValue(self.element.rotation())
-        layout.addRow("Rotation [deg]:", self.rotation_spin)
 
         layout.addRow("Element name:", self.name_edit)
         layout.addRow("X Position [m]:", self.x_spin)
         layout.addRow("Y Position [m]:", self.y_spin)
+        self.rotation_spin = QtWidgets.QDoubleSpinBox()
+        self.rotation_spin.setRange(-360, 360)
+        self.rotation_spin.setValue(self.element.rotation())
+        layout.addRow("Rotation [deg]:", self.rotation_spin)
 
         # Параметры для квадруполя
         if self.element.element_type == "Quadrupole":
