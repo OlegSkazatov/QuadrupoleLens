@@ -541,16 +541,65 @@
               <string>Ellipsoid Parameters</string>
              </property>
              <layout class="QGridLayout" name="gridLayout_7">
-              <item row="1" column="1">
-               <widget class="QDoubleSpinBox" name="beamAxisBSpinBox">
+              <item row="4" column="0">
+               <widget class="QCheckBox" name="show_3dCheckbox">
+                <property name="text">
+                 <string>Show 3D</string>
+                </property>
+               </widget>
+              </item>
+              <item row="7" column="0" colspan="2">
+               <widget class="QPushButton" name="pushButton_2">
+                <property name="text">
+                 <string>Reset</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="label_22">
+                <property name="text">
+                 <string>θ (degr):</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="0" colspan="2">
+               <widget class="QPushButton" name="beamRunButton">
+                <property name="text">
+                 <string>Run</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="label_23">
+                <property name="text">
+                 <string>Density Profile:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QComboBox" name="densityProfileCombo">
+                <item>
+                 <property name="text">
+                  <string>Constant</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Gaussian</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QDoubleSpinBox" name="beamThetaSpinBox">
                 <property name="minimum">
-                 <double>0.000000000000000</double>
+                 <double>-360.000000000000000</double>
                 </property>
                 <property name="maximum">
-                 <double>10000.000000000000000</double>
+                 <double>360.000000000000000</double>
                 </property>
                 <property name="value">
-                 <double>30.000000000000000</double>
+                 <double>0.000000000000000</double>
                 </property>
                </widget>
               </item>
@@ -581,58 +630,23 @@
                 </property>
                </widget>
               </item>
-              <item row="2" column="1">
-               <widget class="QDoubleSpinBox" name="beamThetaSpinBox">
+              <item row="1" column="1">
+               <widget class="QDoubleSpinBox" name="beamAxisBSpinBox">
                 <property name="minimum">
-                 <double>-360.000000000000000</double>
-                </property>
-                <property name="maximum">
-                 <double>360.000000000000000</double>
-                </property>
-                <property name="value">
                  <double>0.000000000000000</double>
                 </property>
-               </widget>
-              </item>
-              <item row="3" column="0">
-               <widget class="QLabel" name="label_23">
-                <property name="text">
-                 <string>Density Profile:</string>
+                <property name="maximum">
+                 <double>10000.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>30.000000000000000</double>
                 </property>
                </widget>
               </item>
-              <item row="2" column="0">
-               <widget class="QLabel" name="label_22">
+              <item row="5" column="0">
+               <widget class="QCheckBox" name="checkBox_2">
                 <property name="text">
-                 <string>θ (degr):</string>
-                </property>
-               </widget>
-              </item>
-              <item row="3" column="1">
-               <widget class="QComboBox" name="densityProfileCombo">
-                <item>
-                 <property name="text">
-                  <string>Constant</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
-                  <string>Gaussian</string>
-                 </property>
-                </item>
-               </widget>
-              </item>
-              <item row="5" column="0" colspan="2">
-               <widget class="QPushButton" name="pushButton_2">
-                <property name="text">
-                 <string>Reset</string>
-                </property>
-               </widget>
-              </item>
-              <item row="4" column="0" colspan="2">
-               <widget class="QPushButton" name="beamRunButton">
-                <property name="text">
-                 <string>Run</string>
+                 <string>Show cross section</string>
                 </property>
                </widget>
               </item>

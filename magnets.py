@@ -1,5 +1,8 @@
 # magnets.py
 import numpy as np
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import art3d
+from scipy.spatial import ConvexHull
 from scipy.spatial.transform import Rotation
 from typing import List
 
@@ -56,9 +59,54 @@ class QuadrupoleLens:
                         points_global[..., 2],
                         alpha=0.2, color='red')
 
-    def render_2d(self, ax):
-        """Отрисовка прямоугольника в 2D"""
-        pass
+    def render_xy(self, ax):
+        self._render_projection(ax, plane='xy')
+
+    def render_xz(self, ax):
+        self._render_projection(ax, plane='xz')
+
+    def render_yz(self, ax):
+        self._render_projection(ax, plane='yz')
+
+    def _render_projection(self, ax, plane):
+        """Универсальный метод проекций для квадруполя"""
+        # Генерация точек на цилиндре
+        theta = np.linspace(0, 2 * np.pi, 50)
+        z = np.linspace(-self.length / 2, self.length / 2, 2)
+        theta_grid, z_grid = np.meshgrid(theta, z)
+
+        # Локальные координаты цилиндра
+        x_loc = z_grid
+        y_loc = self.radius * np.cos(theta_grid)
+        z_loc = self.radius * np.sin(theta_grid)
+
+        # Преобразование в глобальные координаты
+        points = np.stack([x_loc, y_loc, z_loc], axis=-1)
+        points_global = (self.rot_matrix @ points[..., None]).squeeze() + self.position
+
+        # Выбор осей для проекции
+        if plane == 'xy':
+            proj = points_global[..., [0, 1]]
+        elif plane == 'xz':
+            proj = points_global[..., [0, 2]]
+        elif plane == 'yz':
+            proj = points_global[..., [1, 2]]
+
+        # Построение выпуклой оболочки
+        hull = ConvexHull(proj.reshape(-1, 2))
+        poly = plt.Polygon(
+            proj.reshape(-1, 2)[hull.vertices],
+            closed=True,
+            fill=True,
+            color='red',
+            alpha=0.3
+        )
+        ax.add_patch(poly)
+
+        # Для 3D-осей
+        if hasattr(ax, 'get_zlim'):
+            z_coord = 0 if plane == 'yz' else self.position[2]
+            art3d.pathpatch_2d_to_3d(poly, z=z_coord)
 
     def get_bounding_box(self):
         """Возвращает минимальные и максимальные координаты линзы в глобальной системе"""
@@ -140,28 +188,96 @@ class Dipole:
         }
 
     def render_cylinder(self, ax3d, num_points=30):
-        """Отрисовка в 3D (параллелепипед с ориентацией)"""
-        # Создание сетки для параллелепипеда
-        u = np.linspace(0, 2 * np.pi, num_points)
-        v = np.linspace(-self.height / 2, self.height / 2, 2)  # По высоте (Z)
+        """Отрисовка параллелепипеда в 3D"""
+        # Локальные координаты углов параллелепипеда
+        corners = np.array([
+            [-self.width / 2, -self.length / 2, -self.height / 2],
+            [self.width / 2, -self.length / 2, -self.height / 2],
+            [self.width / 2, self.length / 2, -self.height / 2],
+            [-self.width / 2, self.length / 2, -self.height / 2],
+            [-self.width / 2, -self.length / 2, self.height / 2],
+            [self.width / 2, -self.length / 2, self.height / 2],
+            [self.width / 2, self.length / 2, self.height / 2],
+            [-self.width / 2, self.length / 2, self.height / 2],
+        ])
 
-        # Генерация поверхности (X-Y плоскости для разных Z)
-        X = np.outer(np.ones_like(u), np.array([-self.width / 2, self.width / 2]))
-        Y = np.outer(np.ones_like(u), np.array([-self.length / 2, self.length / 2]))
-        Z = np.outer(v, np.ones_like(u))
+        # Преобразование в глобальные координаты
+        global_corners = (self.rot_matrix @ corners.T).T + self.position
 
-        # Преобразование координат
-        points = np.stack([X, Y, Z], axis=-1)
-        points_global = (self.rot_matrix @ points[..., None]).squeeze() + self.position
+        # Список граней (индексы углов)
+        faces = [
+            [0, 1, 2, 3],  # нижняя грань
+            [4, 5, 6, 7],  # верхняя грань
+            [0, 1, 5, 4],  # передняя грань
+            [2, 3, 7, 6],  # задняя грань
+            [0, 3, 7, 4],  # левая грань
+            [1, 2, 6, 5],  # правая грань
+        ]
 
-        # Отрисовка
-        ax3d.plot_surface(points_global[..., 0],
-                          points_global[..., 1],
-                          points_global[..., 2],
-                          alpha=0.2, color='blue')
+        # Отрисовка всех граней
+        for face in faces:
+            verts = global_corners[face]
+            ax3d.add_collection3d(
+                art3d.Poly3DCollection([verts], alpha=0.3, color='blue')
+            )
+
+        # Настройка осей для лучшего отображения
+        ax3d.autoscale_view()
+
+    def render_xy(self, ax):
+        """Проекция на плоскость XY"""
+        self._render_projection(ax, plane='xy')
+
+    def render_xz(self, ax):
+        """Проекция на плоскость XZ"""
+        self._render_projection(ax, plane='xz')
+
+    def render_yz(self, ax):
+        """Проекция на плоскость YZ"""
+        self._render_projection(ax, plane='yz')
+
+    def _render_projection(self, ax, plane):
+        """Общий метод для проекций"""
+        # Получаем локальные координаты углов
+        corners = np.array([
+            [-self.width / 2, -self.length / 2, -self.height / 2],
+            [self.width / 2, -self.length / 2, -self.height / 2],
+            [self.width / 2, self.length / 2, -self.height / 2],
+            [-self.width / 2, self.length / 2, -self.height / 2],
+            [-self.width / 2, -self.length / 2, self.height / 2],
+            [self.width / 2, -self.length / 2, self.height / 2],
+            [self.width / 2, self.length / 2, self.height / 2],
+            [-self.width / 2, self.length / 2, self.height / 2],
+        ])
+
+        # Преобразуем в глобальные координаты
+        global_corners = (self.rot_matrix @ corners.T).T + self.position
+
+        # Выбираем оси для проекции
+        if plane == 'xy':
+            proj = global_corners[:, [0, 1]]
+        elif plane == 'xz':
+            proj = global_corners[:, [0, 2]]
+        elif plane == 'yz':
+            proj = global_corners[:, [1, 2]]
+
+        # Рисуем выпуклую оболочку
+        hull = ConvexHull(proj)
+        poly = plt.Polygon(
+            proj[hull.vertices],
+            closed=True,
+            fill=True,
+            color='blue',
+            alpha=0.4
+        )
+        ax.add_patch(poly)
+
+        # Для 3D-осей нужно преобразовать патч
+        if hasattr(ax, 'get_zlim'):
+            art3d.pathpatch_2d_to_3d(poly, z=0 if plane == 'yz' else self.position[2])
 
 class FieldCalculator:
-    def __init__(self, lenses: List[QuadrupoleLens]):
+    def __init__(self, lenses):
         self.lenses = lenses
 
     def total_field(self, x, y, z):

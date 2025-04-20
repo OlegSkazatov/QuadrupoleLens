@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation
 
 from Editor.editor import ElementEditorWindow
 from beam import Beam
-from magnets import QuadrupoleLens, FieldCalculator
+from magnets import QuadrupoleLens, FieldCalculator, Dipole
 from plot import SingleElectron, ElectronBeam
 
 
@@ -112,7 +112,8 @@ class MainWindow(QMainWindow):
                                rotation=Rotation.identity())  # Стандартная ориентация
         lens2 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0.15, 0, 0),
                                rotation=Rotation.from_euler('x', 90, degrees=True))  # Поворот на 90°
-        lenses = [lens1, lens2]
+        dipole = Dipole(field=1, width=0.2, length=0.2, height=0.1, position=(0.4, 0, 0))
+        lenses = [lens1, lens2, dipole]
         if self.plotting is not None:
             self.plotting.field_calculator = FieldCalculator(lenses)
 
@@ -161,12 +162,12 @@ class MainWindow(QMainWindow):
 
 
 
-def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
-    sys.__excepthook__(cls, exception, traceback)
+# def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
+#     sys.__excepthook__(cls, exception, traceback)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    sys.excepthook = except_hook
+    # sys.excepthook = except_hook
     sys.exit(app.exec_())

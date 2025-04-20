@@ -10,7 +10,7 @@ from scipy.spatial import ConvexHull
 from matplotlib.patches import Ellipse
 import mpl_toolkits.mplot3d.art3d as art3d
 
-from magnets import FieldCalculator
+from magnets import FieldCalculator, QuadrupoleLens
 
 c = 2.99792e8
 
@@ -21,7 +21,6 @@ L0 = c * T0  # Единица длины
 def calculate_trajectory(r0, v0, gamma, field_func, steps):
     """Интегрирование уравнений движения"""
     # Параметры симуляции
-
     # Инициализация массивов
     pos = np.zeros((steps, 3))
     vel = np.zeros((steps, 3))
@@ -292,7 +291,6 @@ class SingleElectron:
 
         # Численное интегрирование
         trajectory = calculate_trajectory(r0, v0, gamma, field_func, steps)
-
         # Визуализация результатов
         self._create_plots(trajectory)
 
@@ -309,8 +307,8 @@ class SingleElectron:
         if self.field_calculator is not None:
             for lens in self.field_calculator.lenses:
                 lens.render_cylinder(ax3d)
-                lens.render_2d(ax_yx)
-                lens.render_2d(ax_zx)
+                lens.render_xy(ax_yx)
+                lens.render_xz(ax_zx)
 
         # Настройка анимации
         line3d, = ax3d.plot([], [], [], 'b-')
@@ -319,7 +317,9 @@ class SingleElectron:
 
         # Лимиты осей
         x1, x2 = trajectory[0][0], trajectory[-1][0]
-        r_max = max(list(map(lambda x: x.radius, self.field_calculator.lenses)))
+
+        # r_max = max(list(map(lambda x: x.radius, self.field_calculator.lenses)))
+
         if x2 > x1:
             x1 = x1 - 0.05 * (x2 - x1)
             x2 = x2 + 0.05 * (x2 - x1)
@@ -327,10 +327,16 @@ class SingleElectron:
             x1 = x1 + 0.05 * (x2 - x1)
             x2 = x2 - 0.05 * (x2 - x1)
         ax_yx.set_xlim(x1, x2)
-        ax_yx.set_ylim(-r_max, r_max)
-        ax_zx.set_xlim(x1, x2)
-        ax_zx.set_ylim(-r_max, r_max)
-
+        ax3d.set_xlabel('X (м)', labelpad=12)
+        ax3d.set_ylabel('Y (м)', labelpad=12)
+        ax3d.set_zlabel('Z (м)', labelpad=12)
+        ax_yx.set_xlabel('X (м)', labelpad=12)
+        ax_yx.set_ylabel('Y (м)', labelpad=12)
+        ax_zx.set_xlabel('X (м)', labelpad=12)
+        ax_zx.set_ylabel('Z (м)', labelpad=12)
+        # ax_yx.set_ylim(-r_max, r_max)
+        # ax_zx.set_xlim(x1, x2)
+        # ax_zx.set_ylim(-r_max, r_max)
         def update(frame):
             # Рассчитываем текущий индекс данных
             skip_frames = 500
