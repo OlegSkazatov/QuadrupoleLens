@@ -260,6 +260,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
                     "x": elem.x() / 10000,  # Конвертация пикселей в метры
                     "y": elem.y() / 10000,
                     "color": elem.brush().color().name(),
+                    "rotation": elem.rotation(),
                     "parameters": {
                         k: v if not isinstance(v, QtGui.QColor) else v.name()
                         for k, v in elem.parameters.items()
@@ -323,13 +324,13 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
                     element.set_position(
                         x, y,
                         element.parameters.get('length', 0.2) * 10000,
-                        element.parameters.get('radius', 0.1) * 10000
+                        element.parameters.get('radius', 0.1) * 10000, rotation=elem_data.get('rotation', 0)
                     )
                 elif elem_type == "Dipole":
                     element.set_position(
                         x, y,
                         element.parameters.get('width', 0.3) * 10000,
-                        element.parameters.get('length', 0.3) * 10000
+                        element.parameters.get('length', 0.3) * 10000, rotation=elem_data.get('rotation', 0)
                     )
 
                 self.scene.addItem(element)
@@ -430,11 +431,15 @@ class ElementParametersDialog(QtWidgets.QDialog):
         # Общие параметры
         self.name_edit = QtWidgets.QLineEdit(self.element.name)
         self.x_spin = QtWidgets.QDoubleSpinBox()
-        self.x_spin.setValue(self.element.parameters.get('x'))
         self.x_spin.setRange(-20, 20)
+        self.x_spin.setValue(self.element.parameters.get('x'))
         self.y_spin = QtWidgets.QDoubleSpinBox()
-        self.y_spin.setValue(self.element.parameters.get('y'))
         self.y_spin.setRange(-20, 20)
+        self.y_spin.setValue(self.element.parameters.get('y'))
+        self.rotation_spin = QtWidgets.QDoubleSpinBox()
+        self.rotation_spin.setRange(-360, 360)
+        self.rotation_spin.setValue(self.element.rotation())
+        layout.addRow("Rotation [deg]:", self.rotation_spin)
 
         layout.addRow("Element name:", self.name_edit)
         layout.addRow("X Position [m]:", self.x_spin)
@@ -503,7 +508,8 @@ class ElementParametersDialog(QtWidgets.QDialog):
             'name': self.name_edit.text(),
             'x': self.x_spin.value(),
             'y': self.y_spin.value(),
-            'color': self.color_btn.palette().button().color()
+            'color': self.color_btn.palette().button().color(),
+            'rotation': self.rotation_spin.value()
         }
 
         if self.element.element_type == "Quadrupole":
@@ -606,10 +612,10 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         self.update_label()
         if self.element_type == 'Quadrupole':
             self.set_position(params['x'] * 10000, params['y'] * 10000, params['length'] * 10000,
-                                  params['radius'] * 10000)  # Обновляем размеры
+                                  params['radius'] * 10000, rotation=params.get('rotation', 0))  # Обновляем размеры
         if self.element_type == 'Dipole':
             self.set_position(params['x'] * 10000, params['y'] * 10000, params['width'] * 10000,
-                              params['length'] * 10000)  # Обновляем размеры
+                              params['length'] * 10000, rotation=params.get('rotation', 0))  # Обновляем размеры
         self.setBrush(QtGui.QBrush(params['color']))
         self.parameters.update(params)
         self.setToolTip(self._update_tooltip())
@@ -617,6 +623,7 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
     def set_position(self, x, y, w, h, rotation=0):
         self.setPos(x, y)
         self.setRect(-w / 2, -h / 2, w, h)
+        self.setRotation(rotation)
 
     def update_label(self):
         """Обновляет текст и позиционирует его по центру"""
