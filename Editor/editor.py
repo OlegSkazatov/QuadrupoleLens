@@ -132,6 +132,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             self.last_mouse_pos = event.pos()
             self.canvas.translate(delta.x(), delta.y())
         super(QtWidgets.QGraphicsView, self.canvas).mouseMoveEvent(event)
+        self.update_grid()
 
     def canvas_mouse_release(self, event):
         if event.button() == QtCore.Qt.LeftButton:
@@ -270,8 +271,9 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         else:
             return  # Убираем сетку, если вышли за пределы
         x0, y0 = view_rect.x() + view_rect.width() / 2, view_rect.y() + view_rect.height() / 2
+        x0, y0 = x0 // step * step, y0 // step * step
         # Параметры отрисовки
-        pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 1.0 * step / 20)
+        pen = QtGui.QPen(QtGui.QColor(200, 200, 200), 1.0 * step / 20)
         bounds = visible_width * 1.1
         border = bounds // step * step
         num_x, num_y = 0, 0
@@ -295,6 +297,15 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             self.grid_group.addToGroup(line1)
             self.grid_group.addToGroup(line2)
             num_y += 1
+
+        # Рисуем оси
+        ax_pen = QtGui.QPen(QtGui.QColor(130, 130, 130), 2.0 * step / 20)
+        x_ax = QtWidgets.QGraphicsLineItem(x0 - border, 0, x0 + border, 0)
+        y_ax = QtWidgets.QGraphicsLineItem(0, y0 - border, 0, y0 + border)
+        x_ax.setPen(ax_pen)
+        y_ax.setPen(ax_pen)
+        self.grid_group.addToGroup(x_ax)
+        self.grid_group.addToGroup(y_ax)
 
 
 class ElementParametersDialog(QtWidgets.QDialog):
@@ -337,6 +348,27 @@ class ElementParametersDialog(QtWidgets.QDialog):
             layout.addRow("Radius [mm]:", self.radius_spin)
 
             layout.addRow("Gradient [T/m]:", self.gradient_spin)
+        # Параметры для диполя
+        if self.element.element_type == "Dipole":
+            self.field_spin = QtWidgets.QDoubleSpinBox()
+            self.field_spin.setRange(0, 1000)
+            self.field_spin.setValue(self.element.parameters.get('field'))
+            layout.addRow("Field [T]:", self.field_spin)
+
+            self.width_spin = QtWidgets.QDoubleSpinBox()
+            self.width_spin.setRange(1, 10000)  # мм
+            self.width_spin.setValue(self.element.parameters.get('width') * 1000)
+            layout.addRow("Width [mm]:", self.width_spin)
+
+            self.length_spin = QtWidgets.QDoubleSpinBox()
+            self.length_spin.setRange(1, 10000)  # мм
+            self.length_spin.setValue(self.element.parameters.get('length') * 1000)
+            layout.addRow("Length [mm]:", self.length_spin)
+
+            self.height_spin = QtWidgets.QDoubleSpinBox()
+            self.height_spin.setRange(1, 10000)  # мм
+            self.height_spin.setValue(self.element.parameters.get('height') * 1000)
+            layout.addRow("Height [mm]:", self.height_spin)
 
         # Выбор цвета
         self.color_btn = QtWidgets.QPushButton()
@@ -372,18 +404,30 @@ class ElementParametersDialog(QtWidgets.QDialog):
                 'gradient': self.gradient_spin.value()
             })
 
+        if self.element.element_type == "Dipole":
+            values.update({
+                'width': self.width_spin.value() / 1000,  # Конвертация мм → м
+                'length': self.length_spin.value() / 1000,
+                'height': self.height_spin.value() / 1000,
+                'field': self.field_spin.value()
+            })
+
         return values
 
 
 class CanvasElement(QtWidgets.QGraphicsRectItem):
     def __init__(self, x, y, element_type, parent):
-        super().__init__(x, y, 2000, 1000)
+        if element_type == "Quadrupole":
+            super().__init__(x, y, 2000, 1000)
+            self.set_position(x, y, 2000, 1000)
+        else:
+            super().__init__(x, y, 3000, 3000)
+            self.set_position(x, y, 3000, 3000)
         self.element_type = element_type
         self.name = f"{element_type}_{id(self)}"
         self.parent = parent
         self.parameters = {}  # Инициализируем хранилище параметров
         self.setTransformOriginPoint(self.rect().center())  # Центр для вращения
-        self.set_position(x, y, 2000, 1000)
 
         # Инициализация параметров по умолчанию
         if self.element_type == "Quadrupole":
@@ -396,6 +440,16 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
                 'length': 0.2  # m
             }
 
+        if self.element_type == 'Dipole':
+            self.parameters = {
+                'name': self.name,
+                'x': 0,
+                'y': 0,
+                'field': 1.0,  # T
+                'width': 0.3,  # m
+                'length': 0.3,  # m
+                'height': 0.1 # m
+            }
         self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
@@ -430,10 +484,12 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         if self.element_type == 'Quadrupole':
             self.set_position(params['x'] * 10000, params['y'] * 10000, params['length'] * 10000,
                                   params['radius'] * 10000)  # Обновляем размеры
+        if self.element_type == 'Dipole':
+            self.set_position(params['x'] * 10000, params['y'] * 10000, params['width'] * 10000,
+                              params['length'] * 10000)  # Обновляем размеры
         self.setBrush(QtGui.QBrush(params['color']))
         self.parameters.update(params)
         self.setToolTip(self._update_tooltip())
-        print(self.x(), self.y())
 
     def set_position(self, x, y, w, h, rotation=0):
         self.setPos(x, y)
