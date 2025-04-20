@@ -12,6 +12,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.parent = parent
         self.setup_ui()
         self.setup_navigation()
+        self.setup_coordinate_label()
         self.setup_grid()
 
     def setup_ui(self):
@@ -85,7 +86,6 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.statusBar().addPermanentWidget(self.coord_label)
 
         # Подключаем отслеживание движения мыши
-        self.canvas.mouseMoveEvent = self.update_coord_label
         self.canvas.setMouseTracking(True)
 
     def setup_navigation(self):
@@ -105,6 +105,9 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         super(QtWidgets.QGraphicsView, self.canvas).mousePressEvent(event)
 
     def canvas_mouse_move(self, event):
+        # Преобразуем координаты курсора в координаты сцены
+        scene_pos = self.canvas.mapToScene(event.pos())
+        self.coord_label.setText(f"X: {scene_pos.x():.2f}, Y: {scene_pos.y():.2f}")
         if self.drag_mode:
             delta = event.pos() - self.last_mouse_pos
             self.last_mouse_pos = event.pos()
@@ -117,12 +120,6 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             self.canvas.setCursor(QtCore.Qt.ArrowCursor)
         super(QtWidgets.QGraphicsView, self.canvas).mouseReleaseEvent(event)
 
-    def update_coord_label(self, event):
-        """Обновляет координаты в статус баре"""
-        # Преобразуем координаты курсора в координаты сцены
-        scene_pos = self.canvas.mapToScene(event.pos())
-        self.coord_label.setText(f"X: {scene_pos.x():.2f}, Y: {scene_pos.y():.2f}")
-        event.accept()
 
     def setup_grid(self):
         self.grid_group = QtWidgets.QGraphicsItemGroup()
@@ -224,10 +221,19 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         # Сохранение в JSON через QFileDialog
 
     def wheelEvent(self, event):
-        zoom_factor = 1.1 if event.angleDelta().y() > 0 else 0.9
-        self.canvas.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.canvas.scale(zoom_factor, zoom_factor)
+        zoom_factor = 1.1  # Более плавное масштабирование
+        if event.angleDelta().y() > 0:
+            self.canvas.scale(zoom_factor, zoom_factor)
+        else:
+            self.canvas.scale(1 / zoom_factor, 1 / zoom_factor)
+
+        # Фиксируем позицию курсора относительно сцены
+        old_pos = self.canvas.mapToScene(event.pos())
         self.update_grid()
+        new_pos = self.canvas.mapToScene(event.pos())
+        delta = new_pos - old_pos
+        self.canvas.translate(delta.x(), delta.y())
+
         event.accept()
 
     def update_grid(self):
@@ -241,27 +247,40 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         visible_width = view_rect.width()
 
         # Автоматический выбор шага сетки
-        steps = [0.001, 0.01, 0.1, 1, 10]  # 1mm, 1cm, 10cm, 1m, 10m
-        step = next((s for s in steps if visible_width / s < 50), steps[-1])
-
+        steps = [2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+        for s in steps:
+            if 20 <= visible_width / s <= 50:
+                step = s
+                break
+        else:
+            step = 200
+        print(step)
         # Параметры отрисовки
-        pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 1.0)
-        bounds = 1000  # метров в каждую сторону
+        pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 1.0 * step / 20)
+        bounds = visible_width * 1.1
 
         # Рисуем вертикальные линии
-        x = -bounds
-        while x <= bounds:
-            line = QtWidgets.QGraphicsLineItem(x, -bounds, x, bounds)
-            line.setPen(pen)
-            self.grid_group.addToGroup(line)
+        x = 0
+        border = bounds // step * step
+        while x <= border:
+            line1 = QtWidgets.QGraphicsLineItem(x, -border, x, border)
+            line2 = QtWidgets.QGraphicsLineItem(-x, -border, -x, border)
+
+            line1.setPen(pen)
+            line2.setPen(pen)
+            self.grid_group.addToGroup(line1)
+            self.grid_group.addToGroup(line2)
             x += step
 
         # Рисуем горизонтальные линии
-        y = -bounds
-        while y <= bounds:
-            line = QtWidgets.QGraphicsLineItem(-bounds, y, bounds, y)
-            line.setPen(pen)
-            self.grid_group.addToGroup(line)
+        y = 0
+        while y <= border:
+            line1 = QtWidgets.QGraphicsLineItem(-border, y, border, y)
+            line2 = QtWidgets.QGraphicsLineItem(-border, -y, border, -y)
+            line1.setPen(pen)
+            line2.setPen(pen)
+            self.grid_group.addToGroup(line1)
+            self.grid_group.addToGroup(line2)
             y += step
 
 
