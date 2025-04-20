@@ -84,6 +84,82 @@ class QuadrupoleLens:
         }
 
 
+class Dipole:
+    def __init__(self, field, width, length, height,
+                 position=(0, 0, 0), rotation=None):
+        self.field_value = field  # T (константное поле)
+        self.width = width  # m (ширина по X)
+        self.length = length  # m (длина по Y)
+        self.height = height  # m (высота по Z)
+        self.position = np.array(position, dtype=float)
+
+        # Ориентация (Rotation object из scipy)
+        self.rotation = rotation or Rotation.identity()
+        self.rot_matrix = self.rotation.as_matrix()
+        self.inv_rot_matrix = self.rot_matrix.T
+
+    def magnetic_field(self, x, y, z):
+        """Поле в точке (x,y,z) в СК диполя (микротесла)"""
+        # Преобразование в локальные координаты
+        local_pos = self.inv_rot_matrix @ (np.array([x, y, z]) - self.position)
+        x_loc, y_loc, z_loc = local_pos
+
+        # Проверка нахождения внутри объёма диполя
+        in_x = abs(x_loc) <= self.width / 2  # X-границы
+        in_y = abs(y_loc) <= self.length / 2  # Y-границы (длина)
+        in_z = abs(z_loc) <= self.height / 2  # Z-границы (высота)
+
+        if not (in_x and in_y and in_z):
+            return np.zeros(3)
+
+        # Поле в локальной системе (направлено по локальной Z)
+        B_local = np.array([0, 0, self.field_value * 1e6])  # конвертация Т → мкТ
+
+        # Поворот поля в глобальную систему
+        return self.rot_matrix @ B_local
+
+    def get_bounding_box(self):
+        """Возвращает границы диполя в глобальной системе"""
+        # Вершины параллелепипеда в локальной СК
+        x = np.array([-self.width / 2, self.width / 2])  # X
+        y = np.array([-self.length / 2, self.length / 2])  # Y (длина)
+        z = np.array([-self.height / 2, self.height / 2])  # Z (высота)
+
+        points = np.array(np.meshgrid(x, y, z)).T.reshape(-1, 3)
+
+        # Преобразование в глобальные координаты
+        global_points = (self.rot_matrix @ points.T).T + self.position
+
+        return {
+            'x_min': np.min(global_points[:, 0]),
+            'x_max': np.max(global_points[:, 0]),
+            'y_min': np.min(global_points[:, 1]),
+            'y_max': np.max(global_points[:, 1]),
+            'z_min': np.min(global_points[:, 2]),
+            'z_max': np.max(global_points[:, 2])
+        }
+
+    def render_cylinder(self, ax3d, num_points=30):
+        """Отрисовка в 3D (параллелепипед с ориентацией)"""
+        # Создание сетки для параллелепипеда
+        u = np.linspace(0, 2 * np.pi, num_points)
+        v = np.linspace(-self.height / 2, self.height / 2, 2)  # По высоте (Z)
+
+        # Генерация поверхности (X-Y плоскости для разных Z)
+        X = np.outer(np.ones_like(u), np.array([-self.width / 2, self.width / 2]))
+        Y = np.outer(np.ones_like(u), np.array([-self.length / 2, self.length / 2]))
+        Z = np.outer(v, np.ones_like(u))
+
+        # Преобразование координат
+        points = np.stack([X, Y, Z], axis=-1)
+        points_global = (self.rot_matrix @ points[..., None]).squeeze() + self.position
+
+        # Отрисовка
+        ax3d.plot_surface(points_global[..., 0],
+                          points_global[..., 1],
+                          points_global[..., 2],
+                          alpha=0.2, color='blue')
+
 class FieldCalculator:
     def __init__(self, lenses: List[QuadrupoleLens]):
         self.lenses = lenses

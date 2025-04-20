@@ -4,6 +4,7 @@ import json
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
 
+# ВАЖНО! Разрешение холста - 1 метр равен 10000 пикселей!
 
 class ElementEditorWindow(QtWidgets.QMainWindow):
     def __init__(self, parent):
