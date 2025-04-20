@@ -382,7 +382,7 @@ class ElementParametersDialog(QtWidgets.QDialog):
 
 class CanvasElement(QtWidgets.QGraphicsRectItem):
     def __init__(self, x, y, element_type, parent):
-        super().__init__(x, y, 40, 20)
+        super().__init__(x, y, 2000, 1000)
         self.element_type = element_type
         self.name = f"{element_type}_{id(self)}"
         self.parent = parent
@@ -394,7 +394,8 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         if self.element_type == "Quadrupole":
             self.parameters = {
                 'gradient': 1.0,  # T/m
-                'radius': 0.1  # m
+                'radius': 0.1,  # m
+                'length': 0.2 # m
             }
 
         self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
