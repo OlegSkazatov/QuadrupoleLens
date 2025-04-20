@@ -1,4 +1,5 @@
 # editor.py
+import json
 
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -60,6 +61,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.set_btn = QtWidgets.QPushButton("Set Configuration")
 
         self.add_btn.clicked.connect(self.add_element)
+        self.remove_btn.clicked.connect(self.remove_element)
         self.save_btn.clicked.connect(self.save_config)
         self.table.itemDoubleClicked.connect(self.on_table_double_click)
 
@@ -219,21 +221,63 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
             self.scene.addItem(new_element)
             self.update_table()
 
+    def remove_element(self):
+        """Удаляет выбранные элементы из сцены и таблицы"""
+        selected_items = self.table.selectedItems()
+
+        # Собираем уникальные строки
+        rows_to_delete = set()
+        for item in selected_items:
+            rows_to_delete.add(item.row())
+
+        # Удаляем элементы сцены
+        for row in sorted(rows_to_delete, reverse=True):
+            elem_item = self.table.item(row, 0)
+            element = elem_item.data(QtCore.Qt.UserRole)
+            self.scene.removeItem(element)
+
+        self.update_table()
+
     def save_config(self):
+        """Сохраняет конфигурацию в JSON файл"""
+        options = QtWidgets.QFileDialog.Options()
+        file_name, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save Configuration",
+            "",
+            "JSON Files (*.json)",
+            options=options
+        )
+
+        if not file_name:
+            return
+
         config = {
             "elements": [
                 {
                     "type": elem.element_type,
-                    "x": elem.x(),
-                    "y": elem.y(),
+                    "x": elem.x() / 10000,  # Конвертация пикселей в метры
+                    "y": elem.y() / 10000,
                     "color": elem.brush().color().name(),
-                    "params": elem.parameters
+                    "parameters": {
+                        k: v if not isinstance(v, QtGui.QColor) else v.name()
+                        for k, v in elem.parameters.items()
+                    }
                 }
                 for elem in self.scene.items()
                 if isinstance(elem, CanvasElement)
             ]
         }
-        # Сохранение в JSON через QFileDialog
+
+        try:
+            with open(file_name, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Ошибка сохранения",
+                f"Не удалось сохранить файл:\n{str(e)}"
+            )
 
     def wheelEvent(self, event):
         zoom_factor = 1.1  # Более плавное масштабирование
