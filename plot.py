@@ -133,9 +133,13 @@ class BeamWorker(QThread):
 class ElectronBeam:
     def __init__(self):
         self.field_calculator = None
+        self.show_3d = False
+        self.show_cross_section = False
 
     def run_simulation(self, beam, num_samples=1000):
         """Основной метод для симуляции пучка"""
+        self.show_3d = beam['show_3d']
+        self.show_cross_section = beam['show_cross_section']
         try:
             # Расчет траекторий для всех частиц
             self._calculate_beam_trajectories(beam, num_samples=num_samples)
@@ -199,9 +203,6 @@ class ElectronBeam:
         median_traj = np.median([traj for traj in trajectories], axis=0)
         ax.plot(median_traj[:, 0], median_traj[:, 1], median_traj[:, 2], 'r-', lw=2)
 
-        # 3. Маркировка начального/конечного сечений
-        # self._draw_beam_section(ax, trajectories, 'start')
-        # self._draw_beam_section(ax, trajectories, 'end')
 
         if self.field_calculator is not None:
             for lens in self.field_calculator.lenses:
@@ -209,35 +210,6 @@ class ElectronBeam:
 
         plt.show()
 
-    def _draw_beam_section(self, ax, trajectories, position='start'):
-        section_points = []
-        for traj in trajectories:
-            idx = 0 if position == 'start' else -1
-            section_points.append(traj[idx])
-
-        points = np.array(section_points)
-        y, z = points[:, 1], points[:, 2]
-
-        # Расчет эллипса
-        cov = np.cov(y, z)
-        lambda_, v = np.linalg.eig(cov)
-        angle = np.degrees(np.arctan2(*v[:, 0][::-1]))
-
-        ell = Ellipse(
-            (np.mean(y), np.mean(z)),
-            np.sqrt(5.991) * 2 * np.sqrt(lambda_[0]),
-            np.sqrt(5.991) * 2 * np.sqrt(lambda_[1]),
-            angle=angle,
-            color='green' if position == 'start' else 'red',
-            alpha=0.5
-        )
-
-        ax.add_patch(ell)
-        art3d.pathpatch_2d_to_3d(
-            ell,
-            z=np.mean([t[0 if position == 'start' else -1][0] for t in trajectories]),
-            zdir="x"
-        )
 
 
 class SingleElectron:

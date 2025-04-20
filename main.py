@@ -58,8 +58,7 @@ class MainWindow(QMainWindow):
             self.plotting.run_simulation(energy, direction, position)
 
         except Exception as e:
-            pass
-            # self._show_error(str(e))
+            self._show_error(str(e))
 
     def launch_beam_simulation(self):
         try:
@@ -75,7 +74,9 @@ class MainWindow(QMainWindow):
                     'theta': self.beamThetaSpinBox.value()
                 },
                 'density_profile': self.densityProfileCombo.currentText(),
-                'energy_spread': self.energySpreadSpinBox.value() / 100
+                'energy_spread': self.energySpreadSpinBox.value() / 100,
+                'show_3d': self.show_3dCheckbox.isChecked(),
+                'show_cross_section': self.showCrossSectionCheckBox.isChecked()
             }
             # Создание пучка
             beam = Beam(beam_params)

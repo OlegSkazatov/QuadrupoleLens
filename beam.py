@@ -98,12 +98,6 @@ class Beam:
         # Преобразование в глобальную систему
         global_points = (calculate_rotation_matrix(self.direction) @ points.T).T + self.position
 
-        # # Учёт продольного разброса
-        # longitudinal_offset = self.a / 10 * self.direction
-        # global_points = np.vstack([
-        #     global_points + longitudinal_offset,
-        #     global_points - longitudinal_offset
-        # ])
 
         return {
             'x_min': np.min(global_points[:, 0]),
