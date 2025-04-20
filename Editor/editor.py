@@ -11,6 +11,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Magnetic Optics Editor")
         self.parent = parent
         self.setup_ui()
+        self.setup_navigation()
         self.setup_grid()
 
     def setup_ui(self):
@@ -128,25 +129,6 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.scene.addItem(self.grid_group)
         self.update_grid()
 
-    @DeprecationWarning
-    def setup_grid_and_axes(self):
-        """Добавляет оси координат и сетку на схему"""
-        # Настройка сетки
-        grid_pen = QtGui.QPen(QtGui.QColor(200, 200, 200), 1, QtCore.Qt.DotLine)
-        for x in range(-500, 501, 50):
-            self.scene.addLine(x, -500, x, 500, grid_pen)
-        for y in range(-500, 501, 50):
-            self.scene.addLine(-500, y, 500, y, grid_pen)
-
-        # Оси координат
-        axis_pen = QtGui.QPen(QtCore.Qt.black, 2)
-        self.scene.addLine(-500, 0, 500, 0, axis_pen)  # X-axis
-        self.scene.addLine(0, -500, 0, 500, axis_pen)  # Y-axis
-
-        # Подписи осей
-        font = QtGui.QFont("Arial", 10)
-        self.scene.addText("X [m]", font).setPos(480, -20)
-        self.scene.addText("Y [m]", font).setPos(10, 480)
 
     def open_parameters_dialog(self, element=None):
         """Открывает диалог редактирования параметров элемента"""
