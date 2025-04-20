@@ -107,7 +107,27 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
     def canvas_mouse_move(self, event):
         # Преобразуем координаты курсора в координаты сцены
         scene_pos = self.canvas.mapToScene(event.pos())
-        self.coord_label.setText(f"X: {scene_pos.x():.2f}, Y: {scene_pos.y():.2f}")
+        x, y = scene_pos.x(), scene_pos.y()
+        x_unit, y_unit = 'm', 'm'
+
+        # Подбираем, в чём отображать координату (метры, сантиметры, миллиметры)
+        if 100 <= abs(x) < 10000:
+            x_unit = 'cm'
+            x = x / 100
+        elif abs(x) < 100:
+            x_unit = 'mm'
+            x = x / 10
+        elif abs(x) >= 10000:
+            x = x / 10000
+        if 100 <= abs(y) < 10000:
+            y_unit = 'cm'
+            y = y / 100
+        elif abs(y) < 100:
+            y_unit = 'mm'
+            y = y / 10
+        elif abs(y) >= 10000:
+            y = y / 10000
+        self.coord_label.setText(f"X: {x:.3f}{x_unit}, Y: {y:.3f}{y_unit}")
         if self.drag_mode:
             delta = event.pos() - self.last_mouse_pos
             self.last_mouse_pos = event.pos()
@@ -200,7 +220,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         type_dialog = QtWidgets.QInputDialog()
         type_, ok = type_dialog.getItem(self, "Select Type", "Element type:", element_types)
         if ok:
-            new_element = CanvasElement(0, 0, type_)
+            new_element = CanvasElement(0, 0, type_, self)
             self.scene.addItem(new_element)
             self.update_table()
 
@@ -253,8 +273,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
                 step = s
                 break
         else:
-            step = 200
-        print(step)
+            return # Убираем сетку, если вышли за пределы
         # Параметры отрисовки
         pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 1.0 * step / 20)
         bounds = visible_width * 1.1
@@ -362,22 +381,22 @@ class ElementParametersDialog(QtWidgets.QDialog):
 
 
 class CanvasElement(QtWidgets.QGraphicsRectItem):
-    def __init__(self, x, y, element_type):
-        super().__init__(0, 0, 40, 20)
+    def __init__(self, x, y, element_type, parent):
+        super().__init__(x, y, 40, 20)
         self.element_type = element_type
         self.name = f"{element_type}_{id(self)}"
+        self.parent = parent
         self.parameters = {}  # Инициализируем хранилище параметров
-        self.set_element_size(x, y)
         self.setTransformOriginPoint(self.rect().center())  # Центр для вращения
+        self.setPos(x, y)
 
         # Инициализация параметров по умолчанию
         if self.element_type == "Quadrupole":
             self.parameters = {
-                'gradient': 10.0,  # T/m
-                'radius': 0.05  # m
+                'gradient': 1.0,  # T/m
+                'radius': 0.1  # m
             }
 
-        self.setPos(x, y)
         self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
