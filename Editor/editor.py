@@ -541,6 +541,7 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         self.parameters = {}  # Инициализируем хранилище параметров
         self.setTransformOriginPoint(self.rect().center())  # Центр для вращения
 
+
         # Инициализация параметров по умолчанию
         if self.element_type == "Quadrupole":
             self.parameters = {
@@ -562,10 +563,19 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
                 'length': 0.3,  # m
                 'height': 0.1 # m
             }
+
+        self.label = QtWidgets.QGraphicsTextItem(self)  # Текстовая метка
+
+        # Настройки текста
+        self.label.setDefaultTextColor(QtGui.QColor(0, 0, 0))
+        font = QtGui.QFont("Arial", 140)
+        font.setBold(True)
+        self.label.setFont(font)
+        self.label.setZValue(1)  # Текст поверх элемента
         self.setBrush(QtGui.QBrush(QtCore.Qt.blue))
-        self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setToolTip(self._update_tooltip())
+        self.update_label()
 
     def _update_tooltip(self):
         params = "\n".join([f"{k}: {v}" for k, v in self.parameters.items()])
@@ -593,6 +603,7 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
 
     def update_parameters(self, params):
         self.name = params.get('name', self.name)
+        self.update_label()
         if self.element_type == 'Quadrupole':
             self.set_position(params['x'] * 10000, params['y'] * 10000, params['length'] * 10000,
                                   params['radius'] * 10000)  # Обновляем размеры
@@ -606,3 +617,15 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
     def set_position(self, x, y, w, h, rotation=0):
         self.setPos(x, y)
         self.setRect(-w / 2, -h / 2, w, h)
+
+    def update_label(self):
+        """Обновляет текст и позиционирует его по центру"""
+        self.label.setPlainText(self.name)
+
+        # Центрирование текста
+        text_rect = self.label.boundingRect()
+        elem_rect = self.rect()
+        self.label.setPos(
+            elem_rect.center().x() - text_rect.width() / 2,
+            elem_rect.center().y() - text_rect.height() / 2
+        )
