@@ -30,6 +30,7 @@ class Beam:
         # Распределения
         self.density_profile = parameters['density_profile']  # 'constant' или 'gaussian'
         self.energy_spread = parameters['energy_spread']  # Относительный разброс (0..1)
+        self.parameters = parameters
 
     def generate_particles(self, num_samples):
         """Генерация репрезентативных частиц"""

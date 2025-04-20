@@ -89,8 +89,7 @@ class MainWindow(QMainWindow):
             )
 
         except Exception as e:
-            pass
-            # self._show_error(str(e))
+            self._show_error(str(e))
 
     def _load_magnetic_system(self):
         """Загрузка всех элементов магнитной системы"""

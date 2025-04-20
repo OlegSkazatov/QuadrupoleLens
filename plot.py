@@ -138,8 +138,8 @@ class ElectronBeam:
 
     def run_simulation(self, beam, num_samples=1000):
         """Основной метод для симуляции пучка"""
-        self.show_3d = beam['show_3d']
-        self.show_cross_section = beam['show_cross_section']
+        self.show_3d = beam.parameters['show_3d']
+        self.show_cross_section = beam.parameters['show_cross_section']
         try:
             # Расчет траекторий для всех частиц
             self._calculate_beam_trajectories(beam, num_samples=num_samples)
@@ -175,22 +175,64 @@ class ElectronBeam:
 
     def _create_beam_plots(self, trajectories, weights):
         """Визуализация для пучка"""
-        fig = plt.figure(figsize=(15, 8))
-        ax = fig.add_subplot(111, projection='3d')
-        # # Отрисовка ВСЕХ траекторий (только для тестов)
-        # for traj, w in zip(trajectories, weights):
-        #     alpha = 0.1 + 0.9 * (w / np.max(weights))
-        #     ax.plot(traj[:, 0], traj[:, 1], traj[:, 2],
-        #             color='blue', alpha=alpha, linewidth=0.5)
+        # Создаем основное окно с 2D проекциями
+        fig_2d = plt.figure(figsize=(15, 8))
 
-        # 1. Визуализация оболочки пучка
+        # Настройка сетки графиков
+        gs = fig_2d.add_gridspec(2, 2)
+        ax_xy = fig_2d.add_subplot(gs[:, 0])  # Большой график XY
+        ax_xz = fig_2d.add_subplot(gs[0, 1])  # Верхний правый XZ
+        ax_yz = fig_2d.add_subplot(gs[1, 1])  # Нижний правый YZ
+
+        # Отрисовка проекций пучка
+        self._plot_2d_projections(ax_xy, ax_xz, ax_yz, trajectories)
+
+        # Отрисовка магнитных элементов
+        if self.field_calculator is not None:
+            for lens in self.field_calculator.lenses:
+                lens.render_xy(ax_xy)
+                lens.render_xz(ax_xz)
+                lens.render_yz(ax_yz)
+
+        # Настройка подписей осей
+        ax_xy.set_xlabel('X (м)')
+        ax_xy.set_ylabel('Y (м)')
+        ax_xz.set_xlabel('X (м)')
+        ax_xz.set_ylabel('Z (м)')
+        ax_yz.set_xlabel('Y (м)')
+        ax_yz.set_ylabel('Z (м)')
+        ax_xy.grid(True)
+        ax_xz.grid(True)
+        ax_yz.grid(True)
+
+        # Отрисовка 3D графика при необходимости
+        if self.show_3d:
+            self._create_3d_plot(trajectories)
+
+        plt.tight_layout()
+        plt.show()
+
+    def _plot_2d_projections(self, ax_xy, ax_xz, ax_yz, trajectories):
+        """Отрисовка 2D проекций траекторий"""
+        for traj in trajectories:
+            # Проекция XY
+            ax_xy.plot(traj[:, 0], traj[:, 1], 'b-', alpha=0.1, linewidth=0.5)
+
+            # Проекция XZ
+            ax_xz.plot(traj[:, 0], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
+
+            # Проекция YZ
+            ax_yz.plot(traj[:, 1], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
+
+    def _create_3d_plot(self, trajectories):
+        """Создание отдельного 3D окна"""
+        fig_3d = plt.figure(figsize=(10, 8))
+        ax_3d = fig_3d.add_subplot(111, projection='3d')
+
+        # Отрисовка оболочки пучка
         all_points = np.concatenate(trajectories)
-
-        # Вычисление выпуклой оболочки
         hull = ConvexHull(all_points)
-
-        # Отрисовка поверхности оболочки
-        ax.plot_trisurf(
+        ax_3d.plot_trisurf(
             all_points[:, 0],
             all_points[:, 1],
             all_points[:, 2],
@@ -199,16 +241,16 @@ class ElectronBeam:
             color='blue'
         )
 
-        # 2. Визуализация медианной траектории
-        median_traj = np.median([traj for traj in trajectories], axis=0)
-        ax.plot(median_traj[:, 0], median_traj[:, 1], median_traj[:, 2], 'r-', lw=2)
-
-
+        # Отрисовка магнитной системы
         if self.field_calculator is not None:
             for lens in self.field_calculator.lenses:
-                lens.render_cylinder(ax)
+                lens.render_cylinder(ax_3d)
 
-        plt.show()
+        # Настройка осей
+        ax_3d.set_xlabel('X (м)')
+        ax_3d.set_ylabel('Y (м)')
+        ax_3d.set_zlabel('Z (м)')
+        plt.title('3D Visualization')
 
 
 
