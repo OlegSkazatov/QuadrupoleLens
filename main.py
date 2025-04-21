@@ -110,10 +110,10 @@ class MainWindow(QMainWindow):
         # Тест 2: Чередуем фокус/дефокус
         lens1 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0, 0, 0),
                                rotation=Rotation.identity())  # Стандартная ориентация
-        lens2 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0.15, 0, 0),
+        lens2 = QuadrupoleLens(gradient=8.0, radius=0.2, length=0.1, position=(0.175, 0, 0),
                                rotation=Rotation.from_euler('x', 90, degrees=True))  # Поворот на 90°
         dipole = Dipole(field=1, width=0.2, length=0.2, height=0.1, position=(0.4, 0, 0))
-        lenses = [lens1, lens2, dipole]
+        lenses = [lens1, lens2]
         if self.plotting is not None:
             self.plotting.field_calculator = FieldCalculator(lenses)
 

@@ -217,63 +217,54 @@ class ElectronBeam:
         plt.show()
 
     def _create_cross_section_animation(self, trajectories):
-        """Создание анимации поперечного сечения"""
-        # Подготовка данных
-        all_points = np.concatenate(trajectories)
-        num_frames = len(all_points) // self.cross_section_step
-        # Создание фигуры
-        fig = plt.figure(figsize=(8, 6))
+        """Отрисовка начального и конечного сечений пучка в 2D"""
+        # Собираем точки сечений
+        start_points = np.array([traj[0] for traj in trajectories if len(traj) > 0])
+        end_points = np.array([traj[-1] for traj in trajectories if len(traj) > 0])
+
+        # Создаем новое окно
+        fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(111)
-        ax.set_title('Поперечное сечение пучка (95% доверительный интервал)')
-        ax.set_xlabel('X (м)')
-        ax.set_ylabel('Y (м)')
+        ax.set_title("Поперечные сечения пучка")
+        ax.set_xlabel("Y (м)")
+        ax.set_ylabel("Z (м)")
         ax.grid(True)
-        # Инициализация элементов анимации
-        scatter = ax.scatter([], [], s=1, alpha=0.3)
-        ellipse = ax.add_patch(Ellipse((0, 0), 0, 0, angle=0, color='r', fill=False, lw=2))
-        time_text = ax.text(0.05, 0.95, '', transform=ax.transAxes)
 
-        # Расчет границ для стабильной анимации
-        x = all_points[:, 0]
-        y = all_points[:, 1]
-        ax.set_xlim(x.min(), x.max())
-        ax.set_ylim(y.min(), y.max())
-        def animate(frame):
-            # Выборка данных для текущего кадра
-            idx = frame * self.cross_section_step
-            points = all_points[:idx]
+        # Отрисовываем точки
+        ax.scatter(start_points[:, 1], start_points[:, 2],
+                   c='green', alpha=0.3, label="Начальное сечение")
+        ax.scatter(end_points[:, 1], end_points[:, 2],
+                   c='red', alpha=0.3, label="Конечное сечение")
 
-            # Обновление рассеяния
-            scatter.set_offsets(points[:, [0, 1]])
+        # Рисуем эллипсы
+        def draw_2d_ellipse(points, color):
+            if len(points) < 2: return
 
-            # Расчет эллипса
-            if len(points) > 10:
-                cov = np.cov(points[:, [0, 1]].T)
-                lambda_, v = np.linalg.eig(cov)
-                angle = np.degrees(np.arctan2(*v[:, 0][::-1]))
+            cov = np.cov(points.T)
+            lambda_, v = np.linalg.eig(cov)
+            angle = np.degrees(np.arctan2(v[1, 0], v[0, 0]))
 
-                # Доверительный интервал 95% (хи-квадрат с 2 степенями свободы)
-                scale = np.sqrt(5.991)
-                width, height = 2 * scale * np.sqrt(lambda_)
+            ell = Ellipse(
+                np.mean(points, axis=0),
+                2*np.sqrt(5.991 * lambda_[0]),
+                2*np.sqrt(5.991 * lambda_[1]),
+                angle=angle,
+                color=color,
+                fill=False,
+                linewidth=2
+            )
+            ax.add_patch(ell)
 
-                # Обновление эллипса
-                ellipse.set_center(np.mean(points[:, [0, 1]], axis=0))
-                ellipse.set_width(width)
-                ellipse.set_height(height)
-                ellipse.set_angle(angle)
+        draw_2d_ellipse(start_points[:, [1, 2]], 'darkgreen')
+        draw_2d_ellipse(end_points[:, [1, 2]], 'darkred')
 
-            # Обновление времени
-            time_text.set_text(f'Шаг: {idx}/{len(all_points)}')
-            return scatter, ellipse, time_text
+        # Настройка границ и легенды
+        all_points = np.concatenate([start_points, end_points])
+        ax.set_xlim(all_points[:, 1].min() - 0.1, all_points[:, 1].max() + 0.1)
+        ax.set_ylim(all_points[:, 2].min() - 0.1, all_points[:, 2].max() + 0.1)
+        ax.legend()
 
-        # Создание анимации
-        ani = FuncAnimation(
-            fig, animate,
-            frames=num_frames,
-            interval=1000 // self.animation_fps,
-            blit=True
-        )
-
+        plt.tight_layout()
         plt.show()
 
     def _plot_2d_projections(self, ax_xy, ax_xz, ax_yz, trajectories):
@@ -304,17 +295,55 @@ class ElectronBeam:
             alpha=0.5,
             color='blue'
         )
+        # 2. Визуализация медианной траектории
+        median_traj = np.median([traj for traj in trajectories], axis=0)
+        ax_3d.plot(median_traj[:, 0], median_traj[:, 1], median_traj[:, 2], 'r-', lw=2)
+
+        # 3. Маркировка начального/конечного сечений
+        self._draw_beam_section(ax_3d, trajectories, 'start')
+        self._draw_beam_section(ax_3d, trajectories, 'end')
 
         # Отрисовка магнитной системы
         if self.field_calculator is not None:
             for lens in self.field_calculator.lenses:
                 lens.render_cylinder(ax_3d)
 
+
         # Настройка осей
         ax_3d.set_xlabel('X (м)')
         ax_3d.set_ylabel('Y (м)')
         ax_3d.set_zlabel('Z (м)')
         plt.title('3D Visualization')
+
+    def _draw_beam_section(self, ax, trajectories, position='start'):
+        section_points = []
+        for traj in trajectories:
+            idx = 0 if position == 'start' else -1
+            section_points.append(traj[idx])
+
+        points = np.array(section_points)
+        y, z = points[:, 1], points[:, 2]
+
+        # Расчет эллипса
+        cov = np.cov(y, z)
+        lambda_, v = np.linalg.eig(cov)
+        angle = np.degrees(np.arctan2(*v[:, 0][::-1]))
+
+        ell = Ellipse(
+            (np.mean(y), np.mean(z)),
+            2 * np.sqrt(5.991 * lambda_[0]),
+            2 * np.sqrt(5.991 * lambda_[1]),
+            angle=angle,
+            color='green' if position == 'start' else 'red',
+            alpha=0.5
+        )
+
+        ax.add_patch(ell)
+        art3d.pathpatch_2d_to_3d(
+            ell,
+            z=np.mean([t[0 if position == 'start' else -1][0] for t in trajectories]),
+            zdir="x"
+        )
 
 
 
