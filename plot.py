@@ -125,7 +125,7 @@ class BeamWorker(QThread):
                 steps=final_steps
             )
             trajectories.append(trajectory)
-            self.progress.emit(int((i + 1) / self.num_samples * 100))
+            self.progress.emit(int(i + 1))
         print('a')
         self.finished.emit(trajectories, particles['weights'])
         print('b')
@@ -163,7 +163,8 @@ class ElectronBeam:
         # Создаем и настраиваем worker
         self.beam_worker = BeamWorker(self, beam, num_samples=num_samples)
         # Подключаем сигналы
-        self.beam_worker.progress.connect(self.progress_dialog.setValue)
+        # self.beam_worker.progress.connect(self.progress_dialog.setValue)
+        self.beam_worker.progress.connect(self.print_num)
         self.beam_worker.finished.connect(self.on_beam_simulation_finished)
         # self.beam_worker.error.connect(self._show_error)
         self.progress_dialog.canceled.connect(self.beam_worker.requestInterruption)
@@ -172,6 +173,8 @@ class ElectronBeam:
         self.beam_worker.start()
         self.progress_dialog.show()
 
+    def print_num(self, num):
+        print(num)
     def on_beam_simulation_finished(self, trajectories, weights):
         self.progress_dialog.close()
         self._create_beam_plots(trajectories, weights)
@@ -271,15 +274,11 @@ class ElectronBeam:
         """Отрисовка 2D проекций траекторий"""
         for traj in trajectories:
             # Проекция XY
-            print(1)
             ax_xy.plot(traj[:, 0], traj[:, 1], 'b-', alpha=0.1, linewidth=0.5)
-            print(2)
             # Проекция XZ
             ax_xz.plot(traj[:, 0], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
-            print(3)
             # Проекция YZ
             ax_yz.plot(traj[:, 1], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
-            print(4)
 
     def _create_3d_plot(self, trajectories):
         """Создание отдельного 3D окна"""
