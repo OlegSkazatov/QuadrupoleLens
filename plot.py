@@ -126,8 +126,9 @@ class BeamWorker(QThread):
             )
             trajectories.append(trajectory)
             self.progress.emit(int((i + 1) / self.num_samples * 100))
-
+        print('a')
         self.finished.emit(trajectories, particles['weights'])
+        print('b')
 
 
 class ElectronBeam:
@@ -221,7 +222,6 @@ class ElectronBeam:
         # Собираем точки сечений
         start_points = np.array([traj[0] for traj in trajectories if len(traj) > 0])
         end_points = np.array([traj[-1] for traj in trajectories if len(traj) > 0])
-
         # Создаем новое окно
         fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(111)
@@ -233,8 +233,8 @@ class ElectronBeam:
         # Отрисовываем точки
         ax.scatter(start_points[:, 1], start_points[:, 2],
                    c='green', alpha=0.3, label="Начальное сечение")
-        ax.scatter(end_points[:, 1], end_points[:, 2],
-                   c='red', alpha=0.3, label="Конечное сечение")
+        # ax.scatter(end_points[:, 1], end_points[:, 2],
+        #            c='red', alpha=0.3, label="Конечное сечение")
 
         # Рисуем эллипсы
         def draw_2d_ellipse(points, color):
@@ -255,8 +255,8 @@ class ElectronBeam:
             )
             ax.add_patch(ell)
 
-        draw_2d_ellipse(start_points[:, [1, 2]], 'darkgreen')
-        draw_2d_ellipse(end_points[:, [1, 2]], 'darkred')
+        # draw_2d_ellipse(start_points[:, [1, 2]], 'darkgreen')
+        # draw_2d_ellipse(end_points[:, [1, 2]], 'darkred')
 
         # Настройка границ и легенды
         all_points = np.concatenate([start_points, end_points])
@@ -271,13 +271,15 @@ class ElectronBeam:
         """Отрисовка 2D проекций траекторий"""
         for traj in trajectories:
             # Проекция XY
+            print(1)
             ax_xy.plot(traj[:, 0], traj[:, 1], 'b-', alpha=0.1, linewidth=0.5)
-
+            print(2)
             # Проекция XZ
             ax_xz.plot(traj[:, 0], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
-
+            print(3)
             # Проекция YZ
             ax_yz.plot(traj[:, 1], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
+            print(4)
 
     def _create_3d_plot(self, trajectories):
         """Создание отдельного 3D окна"""

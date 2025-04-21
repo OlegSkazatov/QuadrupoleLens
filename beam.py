@@ -36,7 +36,8 @@ class Beam:
         """Генерация репрезентативных частиц"""
 
         # 1. Генерация координат в системе пучка
-        if self.density_profile == 'gaussian':
+        if self.density_profile == 'Gaussian':
+            print('bebebe')
             # Генерация по Гауссу с обрезкой на 3 сигма
             u = np.random.normal(0, 1, num_samples)
             v = np.random.normal(0, 1, num_samples)
