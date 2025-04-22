@@ -100,7 +100,7 @@ class BeamWorker(QThread):
 
         # Корректировка шагов для каждой частицы
         trajectories = []
-        for i in range(self.num_samples):
+        for i in range(len(particles['positions'])):
             if self.isInterruptionRequested():
                 break
             # Расчёт индивидуального steps
