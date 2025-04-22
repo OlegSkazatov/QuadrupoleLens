@@ -125,9 +125,10 @@ class BeamWorker(QThread):
                 steps=final_steps
             )
             trajectories.append(trajectory)
-            self.progress.emit(int((i + 1) / self.num_samples * 100))
-
+            self.progress.emit(int(i + 1))
+        print('a')
         self.finished.emit(trajectories, particles['weights'])
+        print('b')
 
 
 class ElectronBeam:
@@ -162,7 +163,8 @@ class ElectronBeam:
         # Создаем и настраиваем worker
         self.beam_worker = BeamWorker(self, beam, num_samples=num_samples)
         # Подключаем сигналы
-        self.beam_worker.progress.connect(self.progress_dialog.setValue)
+        # self.beam_worker.progress.connect(self.progress_dialog.setValue)
+        self.beam_worker.progress.connect(self.print_num)
         self.beam_worker.finished.connect(self.on_beam_simulation_finished)
         # self.beam_worker.error.connect(self._show_error)
         self.progress_dialog.canceled.connect(self.beam_worker.requestInterruption)
@@ -171,6 +173,8 @@ class ElectronBeam:
         self.beam_worker.start()
         self.progress_dialog.show()
 
+    def print_num(self, num):
+        print(num)
     def on_beam_simulation_finished(self, trajectories, weights):
         self.progress_dialog.close()
         self._create_beam_plots(trajectories, weights)
@@ -221,7 +225,6 @@ class ElectronBeam:
         # Собираем точки сечений
         start_points = np.array([traj[0] for traj in trajectories if len(traj) > 0])
         end_points = np.array([traj[-1] for traj in trajectories if len(traj) > 0])
-
         # Создаем новое окно
         fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(111)
@@ -233,8 +236,8 @@ class ElectronBeam:
         # Отрисовываем точки
         ax.scatter(start_points[:, 1], start_points[:, 2],
                    c='green', alpha=0.3, label="Начальное сечение")
-        ax.scatter(end_points[:, 1], end_points[:, 2],
-                   c='red', alpha=0.3, label="Конечное сечение")
+        # ax.scatter(end_points[:, 1], end_points[:, 2],
+        #            c='red', alpha=0.3, label="Конечное сечение")
 
         # Рисуем эллипсы
         def draw_2d_ellipse(points, color):
@@ -255,8 +258,8 @@ class ElectronBeam:
             )
             ax.add_patch(ell)
 
-        draw_2d_ellipse(start_points[:, [1, 2]], 'darkgreen')
-        draw_2d_ellipse(end_points[:, [1, 2]], 'darkred')
+        # draw_2d_ellipse(start_points[:, [1, 2]], 'darkgreen')
+        # draw_2d_ellipse(end_points[:, [1, 2]], 'darkred')
 
         # Настройка границ и легенды
         all_points = np.concatenate([start_points, end_points])
@@ -272,10 +275,8 @@ class ElectronBeam:
         for traj in trajectories:
             # Проекция XY
             ax_xy.plot(traj[:, 0], traj[:, 1], 'b-', alpha=0.1, linewidth=0.5)
-
             # Проекция XZ
             ax_xz.plot(traj[:, 0], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
-
             # Проекция YZ
             ax_yz.plot(traj[:, 1], traj[:, 2], 'b-', alpha=0.1, linewidth=0.5)
 
