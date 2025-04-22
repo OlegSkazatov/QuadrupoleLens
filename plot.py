@@ -34,7 +34,7 @@ def calculate_trajectory(r0, v0, gamma, field_func, steps):
 
         # Релятивистское обновление импульса
         p = gamma * vel[i - 1]  # Текущий импульс [кг * м/c * 1/(me * c)]
-        dp = F * 1.758821 * 10 ** (log10(T0)-6+11)  # Домножаем на e/me * 10^6, т.к. B в микротеслах
+        dp = F * 1.758821 * 10 ** (log10(T0) - 6 + 11)  # Домножаем на e/me * 10^6, т.к. B в микротеслах
         p_new = p + dp
 
         # Пересчет скорости из нового импульса
@@ -89,10 +89,10 @@ class BeamWorker(QThread):
         #     system_bounds['z_max'] - system_bounds['z_min']
         # )
         system_size = max(
-                lens_bounds['x_max'] - lens_bounds['x_min'],
-                lens_bounds['y_max'] - lens_bounds['y_min'],
-                lens_bounds['z_max'] - lens_bounds['z_min']
-            )
+            lens_bounds['x_max'] - lens_bounds['x_min'],
+            lens_bounds['y_max'] - lens_bounds['y_min'],
+            lens_bounds['z_max'] - lens_bounds['z_min']
+        )
 
         # Вычисление базового числа шагов
         steps = int(system_size / L0)
@@ -125,7 +125,7 @@ class BeamWorker(QThread):
                 steps=final_steps
             )
             trajectories.append(trajectory)
-            self.progress.emit(int( (i + 1) / len(particles['positions']) * 100 ))
+            self.progress.emit(int((i + 1) / len(particles['positions']) * 100))
         self.finished.emit(trajectories, particles['weights'])
 
 
@@ -153,8 +153,8 @@ class ElectronBeam:
         """Расчёт траекторий для пучка с адаптивным steps"""
         # Создаем прогресс-диалог
         self.progress_dialog = QProgressDialog(minimum=0, maximum=100,
-            labelText="Calculating beam trajectories..."
-        )
+                                               labelText="Calculating beam trajectories..."
+                                               )
         self.progress_dialog.setWindowTitle("Progress")
         self.progress_dialog.setWindowModality(Qt.WindowModal)
 
@@ -231,8 +231,8 @@ class ElectronBeam:
         # Отрисовываем точки
         ax.scatter(start_points[:, 1], start_points[:, 2],
                    c='green', alpha=0.3, label="Начальное сечение")
-        # ax.scatter(end_points[:, 1], end_points[:, 2],
-        #            c='red', alpha=0.3, label="Конечное сечение")
+        ax.scatter(end_points[:, 1], end_points[:, 2],
+                   c='red', alpha=0.3, label="Конечное сечение")
 
         # Рисуем эллипсы
         def draw_2d_ellipse(points, color):
@@ -244,8 +244,8 @@ class ElectronBeam:
 
             ell = Ellipse(
                 np.mean(points, axis=0),
-                2*np.sqrt(5.991 * lambda_[0]),
-                2*np.sqrt(5.991 * lambda_[1]),
+                2 * np.sqrt(5.991 * lambda_[0]),
+                2 * np.sqrt(5.991 * lambda_[1]),
                 angle=angle,
                 color=color,
                 fill=False,
@@ -253,13 +253,17 @@ class ElectronBeam:
             )
             ax.add_patch(ell)
 
-        # draw_2d_ellipse(start_points[:, [1, 2]], 'darkgreen')
-        # draw_2d_ellipse(end_points[:, [1, 2]], 'darkred')
+        draw_2d_ellipse(start_points[:, [1, 2]], 'darkgreen')
+        draw_2d_ellipse(end_points[:, [1, 2]], 'darkred')
 
         # Настройка границ и легенды
         all_points = np.concatenate([start_points, end_points])
-        ax.set_xlim(all_points[:, 1].min() - 0.1, all_points[:, 1].max() + 0.1)
-        ax.set_ylim(all_points[:, 2].min() - 0.1, all_points[:, 2].max() + 0.1)
+        x_max, x_min = all_points[:, 1].max(), all_points[:, 1].min()
+        delta_x = x_max - x_min
+        y_max, y_min = all_points[:, 2].max(), all_points[:, 2].min()
+        delta_y = y_max - y_min
+        ax.set_xlim(x_min - 0.1 * delta_x, x_max + 0.1 * delta_x)
+        ax.set_ylim(y_min - 0.1 * delta_y, y_max + 0.1 * delta_y)
         ax.legend()
 
         plt.tight_layout()
@@ -304,7 +308,6 @@ class ElectronBeam:
             for lens in self.field_calculator.lenses:
                 lens.render_cylinder(ax_3d)
 
-
         # Настройка осей
         ax_3d.set_xlabel('X (м)')
         ax_3d.set_ylabel('Y (м)')
@@ -340,7 +343,6 @@ class ElectronBeam:
             z=np.mean([t[0 if position == 'start' else -1][0] for t in trajectories]),
             zdir="x"
         )
-
 
 
 class SingleElectron:
@@ -437,6 +439,7 @@ class SingleElectron:
         ax_yx.set_ylabel('Y (м)', labelpad=12)
         ax_zx.set_xlabel('X (м)', labelpad=12)
         ax_zx.set_ylabel('Z (м)', labelpad=12)
+
         # ax_yx.set_ylim(-r_max, r_max)
         # ax_zx.set_xlim(x1, x2)
         # ax_zx.set_ylim(-r_max, r_max)
