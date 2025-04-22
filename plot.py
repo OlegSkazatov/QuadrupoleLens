@@ -125,10 +125,8 @@ class BeamWorker(QThread):
                 steps=final_steps
             )
             trajectories.append(trajectory)
-            self.progress.emit(int(i + 1))
-        print('a')
+            self.progress.emit(int( (i + 1) / len(particles['positions']) * 100 ))
         self.finished.emit(trajectories, particles['weights'])
-        print('b')
 
 
 class ElectronBeam:
@@ -163,8 +161,7 @@ class ElectronBeam:
         # Создаем и настраиваем worker
         self.beam_worker = BeamWorker(self, beam, num_samples=num_samples)
         # Подключаем сигналы
-        # self.beam_worker.progress.connect(self.progress_dialog.setValue)
-        self.beam_worker.progress.connect(self.print_num)
+        self.beam_worker.progress.connect(self.progress_dialog.setValue)
         self.beam_worker.finished.connect(self.on_beam_simulation_finished)
         # self.beam_worker.error.connect(self._show_error)
         self.progress_dialog.canceled.connect(self.beam_worker.requestInterruption)
@@ -173,8 +170,6 @@ class ElectronBeam:
         self.beam_worker.start()
         self.progress_dialog.show()
 
-    def print_num(self, num):
-        print(num)
     def on_beam_simulation_finished(self, trajectories, weights):
         self.progress_dialog.close()
         self._create_beam_plots(trajectories, weights)
