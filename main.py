@@ -23,8 +23,13 @@ class MainWindow(QMainWindow):
         self.resetButton.clicked.connect(self._set_defaults)
         self.openEditorButton.clicked.connect(self.open_editor)
         self.beamOpenEditorButton.clicked.connect(self.open_editor)
+        self.saveButton.clicked.connect(self.save_configuration)
+        self.beamSaveButton.clicked.connect(self.save_configuration)
+        self.loadButton.clicked.connect(self.load_configuration)
+        self.beamLoadButton.clicked.connect(self.load_configuration)
         self.plotting = None
         self.editor_window = None
+        self.lenses = []
         self._set_defaults()
 
     def _set_defaults(self):
@@ -53,7 +58,7 @@ class MainWindow(QMainWindow):
             self.plotting = SingleElectron()
 
             # Загружаем магнитную систему в калькулятор поля
-            self._load_magnetic_system()
+            self.plotting.field_calculator = FieldCalculator(self.lenses.copy())
             # Запуск симуляции
             self.plotting.run_simulation(energy, direction, position)
 
@@ -82,40 +87,56 @@ class MainWindow(QMainWindow):
             beam = Beam(beam_params)
             # Запуск симуляции
             self.plotting = ElectronBeam()
-            self._load_magnetic_system()
+            self.plotting.field_calculator = FieldCalculator(self.lenses.copy())
             self.plotting.run_simulation(
                 beam,
-                num_samples=1000
+                num_samples=500
             )
 
         except Exception as e:
             self._show_error(str(e))
 
-    def _load_magnetic_system(self):
+    def load_magnetic_system(self, json_config):
         """Загрузка всех элементов магнитной системы"""
-        lenses = []
-        # Различные конфигурации для тестов
+        elements = []
 
-        # # Одна линза
-        # main_lens_params = self._get_lens_params()
-        # main_lens = QuadrupoleLens(main_lens_params['gradient'], main_lens_params['radius'],
-        #                            main_lens_params['length'])
-        # lenses = [main_lens]
+        for elem in json_config["elements"]:
+            # Общие параметры для всех элементов
+            position = (elem["x"], elem["y"], 0)  # z = 0 по умолчанию
+            rotation = Rotation.from_euler('z', -elem["rotation"], degrees=True)
+            params = elem["parameters"]
 
-        # Тест 1: Две линзы вдоль оси X
-        # lens1 = QuadrupoleLens(gradient=6.0, radius=0.05, length=0.1, position=(-0.3, 0, 0))
-        # lens2 = QuadrupoleLens(gradient=6.0, radius=0.03, length=0.2, position=(0.2, 0, 0))
-        # lenses = [lens1, lens2]
+            if elem["type"] == "Quadrupole":
+                elements.append(QuadrupoleLens(
+                    gradient=params["gradient"],
+                    radius=params["radius"],
+                    length=params["length"],
+                    position=position,
+                    rotation=rotation
+                ))
 
-        # Тест 2: Чередуем фокус/дефокус
-        lens1 = QuadrupoleLens(gradient=6.0, radius=0.2, length=0.1, position=(0, 0, 0),
-                               rotation=Rotation.identity())  # Стандартная ориентация
-        lens2 = QuadrupoleLens(gradient=8.0, radius=0.2, length=0.1, position=(0.178, 0, 0),
-                               rotation=Rotation.from_euler('x', 90, degrees=True))  # Поворот на 90°
-        dipole = Dipole(field=1, width=0.2, length=0.2, height=0.1, position=(0.4, 0, 0))
-        lenses = [lens1, lens2]
-        if self.plotting is not None:
-            self.plotting.field_calculator = FieldCalculator(lenses)
+            elif elem["type"] == "Dipole":
+                elements.append(Dipole(
+                    field=params["field"],
+                    width=params["width"],  # X-размер
+                    length=params["length"],  # Y-размер
+                    height=params["height"],  # Z-размер
+                    position=position,
+                    rotation=rotation
+                ))
+
+        self.lenses = elements.copy()
+
+    def save_configuration(self):
+        if self.editor_window is None:
+            self.open_editor()
+        self.editor_window.save_config()
+
+    def load_configuration(self):
+        if self.editor_window is None:
+            self.open_editor()
+        self.editor_window.load_config()
+        self.editor_window.set_configuration()
 
     def _get_beam_position(self):
         """Координаты центра пучка"""

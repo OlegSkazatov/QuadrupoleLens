@@ -139,6 +139,8 @@ class ElectronBeam:
 
     def run_simulation(self, beam, num_samples=1000):
         """Основной метод для симуляции пучка"""
+        if self.field_calculator is None:
+            self.field_calculator = FieldCalculator([])
         self.show_3d = beam.parameters['show_3d']
         self.show_cross_section = beam.parameters['show_cross_section']
         try:

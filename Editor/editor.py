@@ -65,6 +65,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
         self.remove_btn.clicked.connect(self.remove_element)
         self.save_btn.clicked.connect(self.save_config)
         self.load_btn.clicked.connect(self.load_config)
+        self.set_btn.clicked.connect(self.set_configuration)
         self.table.itemDoubleClicked.connect(self.on_table_double_click)
 
         btn_layout.addWidget(self.add_btn)
@@ -240,20 +241,7 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
 
         self.update_table()
 
-    def save_config(self):
-        """Сохраняет конфигурацию в JSON файл"""
-        options = QtWidgets.QFileDialog.Options()
-        file_name, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self,
-            "Save Configuration",
-            "",
-            "JSON Files (*.json)",
-            options=options
-        )
-
-        if not file_name:
-            return
-
+    def generate_json(self):
         config = {
             "elements": [
                 {
@@ -271,6 +259,23 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
                 if isinstance(elem, CanvasElement)
             ]
         }
+        return config
+
+    def save_config(self):
+        """Сохраняет конфигурацию в JSON файл"""
+        options = QtWidgets.QFileDialog.Options()
+        file_name, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save Configuration",
+            "",
+            "JSON Files (*.json)",
+            options=options
+        )
+
+        if not file_name:
+            return
+
+        config = self.generate_json()
 
         try:
             with open(file_name, 'w', encoding='utf-8') as f:
@@ -345,6 +350,10 @@ class ElementEditorWindow(QtWidgets.QMainWindow):
                 "Ошибка загрузки",
                 f"Не удалось загрузить файл:\n{str(e)}"
             )
+
+    def set_configuration(self):
+        configuration = self.generate_json()
+        self.parent.load_magnetic_system(configuration)
 
     def wheelEvent(self, event):
         zoom_factor = 1.1  # Более плавное масштабирование
@@ -449,7 +458,7 @@ class ElementParametersDialog(QtWidgets.QDialog):
         # Параметры для квадруполя
         if self.element.element_type == "Quadrupole":
             self.gradient_spin = QtWidgets.QDoubleSpinBox()
-            self.gradient_spin.setRange(0, 1000)
+            self.gradient_spin.setRange(-1000, 1000)
             self.gradient_spin.setValue(self.element.parameters.get('gradient'))
 
             self.length_spin = QtWidgets.QDoubleSpinBox()
@@ -466,7 +475,7 @@ class ElementParametersDialog(QtWidgets.QDialog):
         # Параметры для диполя
         if self.element.element_type == "Dipole":
             self.field_spin = QtWidgets.QDoubleSpinBox()
-            self.field_spin.setRange(0, 1000)
+            self.field_spin.setRange(-1000, 1000)
             self.field_spin.setValue(self.element.parameters.get('field'))
             layout.addRow("Field [T]:", self.field_spin)
 

@@ -24,7 +24,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="singleParticleTab">
        <attribute name="title">
@@ -354,6 +354,9 @@
              <layout class="QHBoxLayout" name="horizontalLayout_6">
               <item>
                <widget class="QDoubleSpinBox" name="beamCurrentSpinBox">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
                 <property name="minimum">
                  <double>0.010000000000000</double>
                 </property>
