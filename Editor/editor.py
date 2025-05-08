@@ -454,6 +454,7 @@ class ElementParametersDialog(QtWidgets.QDialog):
         self.rotation_spin.setRange(-360, 360)
         self.rotation_spin.setValue(self.element.rotation())
         layout.addRow("Rotation [deg]:", self.rotation_spin)
+        self.file = ''
 
         # Параметры для квадруполя
         if self.element.element_type == "Quadrupole":
@@ -478,6 +479,11 @@ class ElementParametersDialog(QtWidgets.QDialog):
             self.field_spin.setRange(-1000, 1000)
             self.field_spin.setValue(self.element.parameters.get('field'))
             layout.addRow("Field [T]:", self.field_spin)
+
+            self.real_field = QtWidgets.QPushButton()
+            self.real_field.clicked.connect(self.import_field)
+            self.real_field.setText("Import TXT")
+            layout.addRow("Or import a real field:", self.real_field)
 
             self.width_spin = QtWidgets.QDoubleSpinBox()
             self.width_spin.setRange(1, 10000)  # мм
@@ -513,13 +519,29 @@ class ElementParametersDialog(QtWidgets.QDialog):
         if color.isValid():
             self.color_btn.setStyleSheet(f"background-color: {color.name()}")
 
+    def import_field(self):
+        options = QtWidgets.QFileDialog.Options()
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Load Configuration",
+            "",
+            "TXT Files (*.txt)",
+            options=options
+        )
+
+        if not file_name:
+            return
+        self.file = file_name
+
+
     def get_values(self):
         values = {
             'name': self.name_edit.text(),
             'x': self.x_spin.value(),
             'y': self.y_spin.value(),
             'color': self.color_btn.palette().button().color(),
-            'rotation': self.rotation_spin.value()
+            'rotation': self.rotation_spin.value(),
+            'file': self.file
         }
 
         if self.element.element_type == "Quadrupole":
@@ -541,7 +563,7 @@ class ElementParametersDialog(QtWidgets.QDialog):
 
 
 class CanvasElement(QtWidgets.QGraphicsRectItem):
-    def __init__(self, x, y, element_type, parent, name=''):
+    def __init__(self, x, y, element_type, parent, name='', file=''):
         if element_type == "Quadrupole":
             super().__init__(x, y, 2000, 1000)
             self.set_position(x, y, 2000, 1000)
@@ -554,6 +576,7 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
         else:
             self.name = name
         self.parent = parent
+        self.file = file
         self.parameters = {}  # Инициализируем хранилище параметров
         self.setTransformOriginPoint(self.rect().center())  # Центр для вращения
 
@@ -566,7 +589,8 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
                 'y': 0,
                 'gradient': 1.0,  # T/m
                 'radius': 0.1,  # m
-                'length': 0.2  # m
+                'length': 0.2,  # m
+                'file': self.file
             }
 
         if self.element_type == 'Dipole':
@@ -577,7 +601,8 @@ class CanvasElement(QtWidgets.QGraphicsRectItem):
                 'field': 1.0,  # T
                 'width': 0.3,  # m
                 'length': 0.3,  # m
-                'height': 0.1 # m
+                'height': 0.1, # m
+                'file': self.file
             }
 
         self.label = QtWidgets.QGraphicsTextItem(self)  # Текстовая метка

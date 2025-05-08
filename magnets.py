@@ -2,6 +2,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import art3d
+from scipy.interpolate import RegularGridInterpolator
 from scipy.spatial import ConvexHull
 from scipy.spatial.transform import Rotation
 from typing import List
@@ -9,11 +10,14 @@ from typing import List
 
 class QuadrupoleLens:
     def __init__(self, gradient, radius, length,
-                 position=(0, 0, 0), rotation=None):
+                 position=(0, 0, 0), rotation=None, file=''):
+        self.interpolator = None
+        self.real_field = None
         self.gradient = gradient  # T/m
         self.radius = radius  # m
         self.length = length  # m
         self.position = np.array(position, dtype=float)
+        self.file = file
 
         # Ориентация (Rotation object из scipy)
         self.rotation = rotation or Rotation.identity()
@@ -23,11 +27,35 @@ class QuadrupoleLens:
         # Обратная матрица для преобразования координат
         self.inv_rot_matrix = self.rot_matrix.T
 
+    def import_field(self, f):
+        data = []
+        with open(f, "r") as file:
+            lines = file.read().split("\n")[1:]  # Пропускаем заголовок
+            for line in lines:
+                if not line.strip(): continue
+                parts = line.replace(",", ".").split("\t")
+                row = list(map(float, parts))
+                data.append(row)
+        data = np.array(data)
+        self.real_field = data
+
     def magnetic_field(self, x, y, z):
         """Поле в точке (x,y,z) в СК линзы (микротесла)"""
         # Преобразование в локальные координаты
         local_pos = self.inv_rot_matrix @ (np.array([x, y, z]) - self.position)
         x_loc, y_loc, z_loc = local_pos
+
+        if self.real_field is not None:
+            if self.interpolator is None:
+                x_grid, y_grid, z_grid, B_values = self.real_field
+                self.interpolator = RegularGridInterpolator(
+                    (x_grid, y_grid, z_grid),
+                    B_values,
+                    method='linear',
+                    bounds_error=False,
+                    fill_value=0.0
+                )
+            return self.interpolator((x_loc, y_loc))
 
         if abs(x_loc) > self.length / 2 or y_loc ** 2 + z_loc ** 2 > self.radius ** 2:
             return np.zeros(3)
@@ -134,23 +162,52 @@ class QuadrupoleLens:
 
 class Dipole:
     def __init__(self, field, width, length, height,
-                 position=(0, 0, 0), rotation=None):
+                 position=(0, 0, 0), rotation=None, file=''):
+        self.interpolator = None
+        self.real_field = None
         self.field_value = field  # T (константное поле)
         self.width = width  # m (ширина по X)
         self.length = length  # m (длина по Y)
         self.height = height  # m (высота по Z)
         self.position = np.array(position, dtype=float)
+        self.file = file
 
         # Ориентация (Rotation object из scipy)
         self.rotation = rotation or Rotation.identity()
         self.rot_matrix = self.rotation.as_matrix()
         self.inv_rot_matrix = self.rot_matrix.T
 
+        if self.file:
+            self.import_field(self.file)
+
+    def import_field(self, f):
+        data = []
+        with open(f, "r") as file:
+            lines = file.read().split("\n")[1:]  # Пропускаем заголовок
+            for line in lines:
+                if not line.strip(): continue
+                parts = line.replace(",", ".").split("\t")
+                row = list(map(float, parts))
+                data.append(row)
+        data = np.array(data)
+        self.real_field = data
+
     def magnetic_field(self, x, y, z):
         """Поле в точке (x,y,z) в СК диполя (микротесла)"""
         # Преобразование в локальные координаты
         local_pos = self.inv_rot_matrix @ (np.array([x, y, z]) - self.position)
         x_loc, y_loc, z_loc = local_pos
+        if self.real_field is not None:
+            if self.interpolator is None:
+                x_grid, y_grid, B_values = self.real_field
+                self.interpolator = RegularGridInterpolator(
+                    (x_grid, y_grid),
+                    B_values,
+                    method='linear',
+                    bounds_error=False,
+                    fill_value=0.0
+                )
+            return self.interpolator((x_loc, y_loc))
 
         # Проверка нахождения внутри объёма диполя
         in_x = abs(x_loc) <= self.width / 2  # X-границы

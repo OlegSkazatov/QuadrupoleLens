@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
             position = (elem["x"], elem["y"], 0)  # z = 0 по умолчанию
             rotation = Rotation.from_euler('z', -elem["rotation"], degrees=True)
             params = elem["parameters"]
+            file = params["file"]
 
             if elem["type"] == "Quadrupole":
                 elements.append(QuadrupoleLens(
@@ -112,7 +113,8 @@ class MainWindow(QMainWindow):
                     radius=params["radius"],
                     length=params["length"],
                     position=position,
-                    rotation=rotation
+                    rotation=rotation,
+                    file=file
                 ))
 
             elif elem["type"] == "Dipole":
@@ -122,7 +124,8 @@ class MainWindow(QMainWindow):
                     length=params["length"],  # Y-размер
                     height=params["height"],  # Z-размер
                     position=position,
-                    rotation=rotation
+                    rotation=rotation,
+                    file=file
                 ))
 
         self.lenses = elements.copy()
