@@ -1,0 +1,60 @@
+{
+    "elements": [
+        {
+            "type": "Quadrupole",
+            "x": 0.14787999999999998,
+            "y": 0.0,
+            "color": "#000000",
+            "rotation": 0.0,
+            "parameters": {
+                "name": "Tube1",
+                "x": 0.14787999999999998,
+                "y": 0.0,
+                "gradient": 0.0,
+                "radius": 0.04,
+                "length": 0.29575,
+                "file": "",
+                "color": "#000000",
+                "rotation": 0.0
+            }
+        },
+        {
+            "type": "Dipole",
+            "x": 0.5541699999999999,
+            "y": 0.2113,
+            "color": "#000000",
+            "rotation": 45.0,
+            "parameters": {
+                "name": "Tube2",
+                "x": 0.5541699999999999,
+                "y": 0.21130000000000002,
+                "field": 0.0,
+                "width": 0.23,
+                "length": 0.04,
+                "height": 0.1,
+                "file": "",
+                "color": "#000000",
+                "rotation": 45.0
+            }
+        },
+        {
+            "type": "Dipole",
+            "x": 0.39238,
+            "y": 0.024,
+            "color": "#0000ff",
+            "rotation": 0.0,
+            "parameters": {
+                "name": "D1",
+                "x": 0.39238,
+                "y": 0.024,
+                "field": 1.0,
+                "width": 0.19125,
+                "length": 0.228,
+                "height": 0.04,
+                "file": "",
+                "color": "#0000ff",
+                "rotation": 0.0
+            }
+        }
+    ]
+}
