@@ -199,7 +199,21 @@ class Dipole:
         x_loc, y_loc, z_loc = local_pos
         if self.real_field is not None:
             if self.interpolator is None:
-                x_grid, y_grid, B_values = self.real_field
+                x_grid = np.unique(self.real_field[:, 0])
+                y_grid = np.unique(self.real_field[:, 1])
+                x_size = len(x_grid)
+                y_size = len(y_grid)
+
+                # Сортируем данные сначала по X, затем по Y
+                sorted_indices = np.lexsort((self.real_field[:, 1], self.real_field[:, 0]))
+                sorted_data = self.real_field[sorted_indices]
+
+                # Проверяем согласованность данных
+                if len(sorted_data) != x_size * y_size:
+                    raise ValueError("Данные не образуют регулярную сетку")
+
+                B_values = sorted_data[:, 2].reshape(x_size, y_size)
+
                 self.interpolator = RegularGridInterpolator(
                     (x_grid, y_grid),
                     B_values,
@@ -207,7 +221,7 @@ class Dipole:
                     bounds_error=False,
                     fill_value=0.0
                 )
-            return self.interpolator((x_loc, y_loc))
+            return np.array([0, 0, self.interpolator((x_loc, y_loc)) * 1e6])
 
         # Проверка нахождения внутри объёма диполя
         in_x = abs(x_loc) <= self.width / 2  # X-границы

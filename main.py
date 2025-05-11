@@ -63,7 +63,8 @@ class MainWindow(QMainWindow):
             self.plotting.run_simulation(energy, direction, position)
 
         except Exception as e:
-            self._show_error(str(e))
+            raise e
+            # self._show_error(str(e))
 
     def launch_beam_simulation(self):
         try:
@@ -186,12 +187,12 @@ class MainWindow(QMainWindow):
 
 
 
-# def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
-#     sys.__excepthook__(cls, exception, traceback)
+def except_hook(cls, exception, traceback):  # Чтобы видеть где косяк
+    sys.__excepthook__(cls, exception, traceback)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    # sys.excepthook = except_hook
+    sys.excepthook = except_hook
     sys.exit(app.exec_())

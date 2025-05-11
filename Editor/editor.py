@@ -441,15 +441,15 @@ class ElementParametersDialog(QtWidgets.QDialog):
         # Общие параметры
         self.name_edit = QtWidgets.QLineEdit(self.element.name)
         self.x_spin = QtWidgets.QDoubleSpinBox()
-        self.x_spin.setRange(-20, 20)
-        self.x_spin.setValue(self.element.parameters.get('x'))
+        self.x_spin.setRange(-20000, 20000)
+        self.x_spin.setValue(self.element.parameters.get('x') * 1000)
         self.y_spin = QtWidgets.QDoubleSpinBox()
-        self.y_spin.setRange(-20, 20)
-        self.y_spin.setValue(self.element.parameters.get('y'))
+        self.y_spin.setRange(-20000, 20000)
+        self.y_spin.setValue(self.element.parameters.get('y') * 1000)
 
         layout.addRow("Element name:", self.name_edit)
-        layout.addRow("X Position [m]:", self.x_spin)
-        layout.addRow("Y Position [m]:", self.y_spin)
+        layout.addRow("X Position [mm]:", self.x_spin)
+        layout.addRow("Y Position [mm]:", self.y_spin)
         self.rotation_spin = QtWidgets.QDoubleSpinBox()
         self.rotation_spin.setRange(-360, 360)
         self.rotation_spin.setValue(self.element.rotation())
@@ -537,8 +537,8 @@ class ElementParametersDialog(QtWidgets.QDialog):
     def get_values(self):
         values = {
             'name': self.name_edit.text(),
-            'x': self.x_spin.value(),
-            'y': self.y_spin.value(),
+            'x': self.x_spin.value() / 1000,
+            'y': self.y_spin.value() / 1000,
             'color': self.color_btn.palette().button().color(),
             'rotation': self.rotation_spin.value(),
             'file': self.file
