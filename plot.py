@@ -402,7 +402,7 @@ class SingleElectron:
         self._create_plots(trajectory)
 
     def _create_plots(self, trajectory):
-        """Создание графиков и анимации"""
+        """Создание графиков без анимации"""
         fig = plt.figure(figsize=(15, 8))
         ax3d = fig.add_subplot(121, projection='3d')
         ax_yx = fig.add_subplot(222)
@@ -417,15 +417,13 @@ class SingleElectron:
                 lens.render_xy(ax_yx)
                 lens.render_xz(ax_zx)
 
-        # Настройка анимации
-        line3d, = ax3d.plot([], [], [], 'b-')
-        line_yx, = ax_yx.plot([], [], 'b-')
-        line_zx, = ax_zx.plot([], [], 'b-')
+        # Статичное отображение всей траектории
+        ax3d.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2], 'b-')
+        ax_yx.plot(trajectory[:, 0], trajectory[:, 1], 'b-')
+        ax_zx.plot(trajectory[:, 0], trajectory[:, 2], 'b-')
 
         # Лимиты осей
         x1, x2 = trajectory[0][0], trajectory[-1][0]
-
-        # r_max = max(list(map(lambda x: x.radius, self.field_calculator.lenses)))
 
         if x2 > x1:
             x1 = x1 - 0.05 * (x2 - x1)
@@ -433,6 +431,7 @@ class SingleElectron:
         else:
             x1 = x1 + 0.05 * (x2 - x1)
             x2 = x2 - 0.05 * (x2 - x1)
+
         ax_yx.set_xlim(x1, x2)
         ax3d.set_xlabel('X (м)', labelpad=12)
         ax3d.set_ylabel('Y (м)', labelpad=12)
@@ -442,28 +441,4 @@ class SingleElectron:
         ax_zx.set_xlabel('X (м)', labelpad=12)
         ax_zx.set_ylabel('Z (м)', labelpad=12)
 
-        # ax_yx.set_ylim(-r_max, r_max)
-        # ax_zx.set_xlim(x1, x2)
-        # ax_zx.set_ylim(-r_max, r_max)
-        def update(frame):
-            # Рассчитываем текущий индекс данных
-            skip_frames = 500
-            idx = (frame + 1) * skip_frames
-
-            # Обрезаем индекс до размера массиваx
-            if idx >= len(trajectory):
-                idx = len(trajectory) - 1
-
-            # Обновляем 3D траекторию
-            line3d.set_data(trajectory[:idx, 0], trajectory[:idx, 1])
-            line3d.set_3d_properties(trajectory[:idx, 2])
-
-            # Обновляем 2D проекции
-            line_yx.set_data(trajectory[:idx, 0], trajectory[:idx, 1])
-            line_zx.set_data(trajectory[:idx, 0], trajectory[:idx, 2])
-
-            return line3d, line_yx, line_zx
-
-        self.ani = FuncAnimation(fig, update, frames=range(len(trajectory) // 100),
-                                 interval=20, blit=True)
         plt.show()
